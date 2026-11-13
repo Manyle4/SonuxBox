@@ -1,0 +1,10 @@
+/home/elynam/img2sound/build/CMakeFiles/img2sound.dir
+/home/elynam/img2sound/build/CMakeFiles/tone_test.dir
+/home/elynam/img2sound/build/CMakeFiles/melody_test.dir
+/home/elynam/img2sound/build/CMakeFiles/image_to_wav.dir
+/home/elynam/img2sound/build/CMakeFiles/image_story.dir
+/home/elynam/img2sound/build/CMakeFiles/color_debug.dir
+/home/elynam/img2sound/build/CMakeFiles/earth_story.dir
+/home/elynam/img2sound/build/CMakeFiles/api_server.dir
+/home/elynam/img2sound/build/CMakeFiles/edit_cache.dir
+/home/elynam/img2sound/build/CMakeFiles/rebuild_cache.dir

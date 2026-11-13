@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/elynam/img2sound/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
