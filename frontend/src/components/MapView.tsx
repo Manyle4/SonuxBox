@@ -29,8 +29,14 @@ export function MapView({ imageUrl, imageAlt, result, time, playing, onSeek }: P
   const goTo = (c: number) => {
     if (!result) return
     setExplore(c)
-    if (playing) onSeek(c * result.stepSec)
-    else playColumn(columnInfo(result, c))
+    if (playing) {
+      onSeek(c * result.stepSec)
+      return
+    }
+    const info = columnInfo(result, c)
+    playColumn(info)
+    // Phones buzz harder over stronger slices (Android; iOS doesn't allow it from a web page).
+    if (!info.rest) navigator.vibrate?.(Math.round(10 + 50 * info.strength))
   }
 
   const onMove = (e: PointerEvent<HTMLDivElement>) => {

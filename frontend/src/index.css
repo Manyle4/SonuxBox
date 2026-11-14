@@ -175,3 +175,10 @@ footer a { color: var(--muted); }
 .mixer .rate.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .download { background: none; cursor: pointer; }
 .roll .note.muted { opacity: 0.12 !important; }
+
+/* ---- share + read aloud ---- */
+.linkbtn { margin-left: 10px; font-size: 0.8rem; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); }
+.linkbtn:hover { border-color: var(--accent); }
+.hearing-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.hearing-head h3 { margin: 0; }
+.hearing-head .linkbtn { margin-left: 0; }

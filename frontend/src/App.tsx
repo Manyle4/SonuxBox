@@ -8,6 +8,8 @@ import { MapView } from './components/MapView'
 import { ModeToggle } from './components/ModeToggle'
 import { PianoRoll } from './components/PianoRoll'
 import { PlayerBar } from './components/PlayerBar'
+import { CopyLink, ReadAloud } from './components/Extras'
+import { setLink } from './link'
 import { describePiece } from './describe'
 import { prerendered, TRACKS, trackUrl, type Track } from './tracks'
 
@@ -39,10 +41,12 @@ export default function App() {
   const audio = useAudioEngine(status === 'ready' && piece ? piece.notes : null, gridSec, muted)
   const { playing, time, toggle, seek } = audio
 
-  // Wake the server while people look around, so their first track is quick.
+  // Wake the server while people look around, so their first upload is quick.
   useEffect(() => {
     fetch(`${API_URL}/api/health`).catch(() => {})
   }, [])
+
+
 
   const run = useCallback(async (src: Source, m: AnalysisMode) => {
     abortRef.current?.abort()
@@ -101,16 +105,19 @@ export default function App() {
   const onFile = (file: File) => {
     if (!/^image\/(png|jpeg)$/.test(file.type)) return fail('Please pick a PNG or JPEG image.')
     if (file.size > MAX_UPLOAD_BYTES) return fail('That image is over 20 MB. Try a smaller copy.')
+    setLink(null, null) // uploads can't be shared by link
     pickSource({ blob: file, name: file.name, previewUrl: URL.createObjectURL(file), track: null }, mode)
   }
 
-  const onTrack = async (id: string) => {
+  const onTrack = async (id: string, m?: AnalysisMode) => {
     const track = TRACKS.find((t) => t.id === id)
     if (!track) return
+    const useMode = m ?? track.mode // each track starts in the mode that suits it
     try {
       const blob = await (await fetch(trackUrl(id))).blob()
-      setMode(track.mode) // each track starts in the mode that suits it
-      pickSource({ blob, name: `${id}.jpg`, previewUrl: trackUrl(id), track }, track.mode)
+      setMode(useMode)
+      setLink(id, useMode === track.mode ? null : useMode)
+      pickSource({ blob, name: `${id}.jpg`, previewUrl: trackUrl(id), track }, useMode)
     } catch {
       fail('Could not load that track.')
     }
@@ -119,8 +126,20 @@ export default function App() {
   // Changing mode re-runs the current image.
   const onMode = (m: AnalysisMode) => {
     setMode(m)
+    if (source?.track) setLink(source.track.id, m === source.track.mode ? null : m)
     if (source) void run(source, m)
   }
+
+  // Open the track named in the link (?track=co&mode=terrain), once.
+  const linkOpened = useRef(false)
+  useEffect(() => {
+    if (linkOpened.current) return
+    linkOpened.current = true
+    const q = new URLSearchParams(location.search)
+    const id = q.get('track')
+    const m = q.get('mode')
+    if (id) void onTrack(id, m === 'adaptive' || m === 'terrain' ? m : undefined)
+  })
 
   // Space bar plays/pauses, unless you're on a control that already uses it.
   useEffect(() => {
@@ -198,6 +217,7 @@ export default function App() {
                       {track.source.label}
                     </a>
                   )}
+                  {track && <CopyLink />}
                 </div>
                 {(loading || (status === 'ready' && audio.rendering)) && (
                   <span className="status">
@@ -227,7 +247,10 @@ export default function App() {
                   <PianoRoll result={piece} time={time} onSeek={seek} muted={muted} />
 
                   <section className="hearing" aria-labelledby="hearing-title">
-                    <h3 id="hearing-title">What you're hearing</h3>
+                    <div className="hearing-head">
+                      <h3 id="hearing-title">What you're hearing</h3>
+                      <ReadAloud text={[track ? `${track.about} ${track.listen}` : '', describePiece(piece, title)].join(' ')} />
+                    </div>
                     {track && <p className="about">{track.about} {track.listen}</p>}
                     <p>{describePiece(piece, title)}</p>
                     <details>
