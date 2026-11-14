@@ -3,59 +3,105 @@
 #include "notes.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <vector>
 
-constexpr double kTwoPi = 6.283185307179586;    //2pi
-constexpr double kRelease = 0.20;   //How long the sound continues fading out after the note ends
+constexpr double kTwoPi = 6.283185307179586;
+constexpr double kVibratoRate = 5.5;  // pitch wobbles per second
 
-inline double adsr(double t, double noteDur) {
-    const double attack = 0.01; //How fast it goes from silence to the highest volume
-    const double decay = 0.08;  //Like it should go down a bit to a level volume
-    const double sustain = 0.70;//How long it holds the level volume
+// Everything that defines how one "instrument" sounds.
+struct Instrument {
+    double attack;                    // seconds to fade in
+    double decay;                     // seconds to settle from the peak down to the sustain level
+    double sustain;                   // held loudness level, 0..1
+    double release;                   // seconds to fade out after the note ends
+    std::array<double, 6> harmonics;  // loudness of the 1st..6th overtone (0 = unused)
+    int unison;                       // how many slightly detuned copies are layered (1 = none)
+    double detuneCents;               // spread between those copies (100 cents = one semitone)
+    double vibrato;                   // pitch wobble depth as a fraction of the frequency (0 = none)
+    double gain;                      // overall loudness of this instrument
+};
 
-    if (t < 0.0) return 0.0;
-    if (t < noteDur) {  //How to apply the attack, delay and sustain to each note based on the time
-        if (t < attack) return t / attack;
-        if (t < attack + decay) return 1.0 - (1.0 - sustain) * ((t - attack) / decay);
-        return sustain;
-    }
-    const double r = t - noteDur; //Once the note duration is done how long it is fading out
-    if (r >= kRelease) return 0.0;  //Sound should stop if the fading time is done
-    return sustain * (1.0 - r / kRelease);
+// One instrument per voice. 'static const' means each is created once and shared.
+inline const Instrument& instrumentFor(int voice) {
+    //                              att    dec   sus   rel   harmonics                        uni  cents vib    gain
+    static const Instrument melody = {0.015, 0.10, 0.75, 0.30, {1.0, 0.30, 0.12, 0.0, 0.0, 0.0},  1, 0.0, 0.004, 0.30};
+    static const Instrument bass   = {0.040, 0.10, 0.85, 0.50, {1.0, 0.50, 0.25, 0.10, 0.0, 0.0}, 1, 0.0, 0.0,   0.32};
+    static const Instrument pad    = {0.700, 0.30, 0.85, 1.40, {1.0, 0.50, 0.33, 0.25, 0.0, 0.0}, 3, 7.0, 0.0,   0.09};
+    if (voice == 1) return bass;
+    if (voice == 2) return pad;
+    return melody;
 }
 
+// ADSR envelope: the loudness shape of a note.
+// t = seconds since the note started, noteDur = how long the key is held.
+inline double adsr(double t, double noteDur, const Instrument& in) {
+    if (t < 0.0) return 0.0;
+    if (t < noteDur) {
+        if (t < in.attack) return t / in.attack;
+        if (t < in.attack + in.decay) return 1.0 - (1.0 - in.sustain) * ((t - in.attack) / in.decay);
+        return in.sustain;
+    }
+    const double r = t - noteDur;  // time since release started
+    if (r >= in.release) return 0.0;
+    const double levelAtRelease = adsr(noteDur * 0.999999, noteDur, in);  // loudness just before release
+    return levelAtRelease * (1.0 - r / in.release);
+}
+
+// Turn a list of notes into audio samples (floats between -1 and 1), mono.
 inline std::vector<float> renderNotes(const std::vector<NoteEvent>& notes, int sampleRate) {
-    double endSec = 0.0;    //Length of the longest note
+    // 1. Work out how long the whole piece is (each instrument has its own release time).
+    double endSec = 0.0;
     for (const NoteEvent& n : notes) {
-        endSec = std::max(endSec, n.startSec + n.durationSec + kRelease);
+        endSec = std::max(endSec, n.startSec + n.durationSec + instrumentFor(n.voice).release);
     }
 
-    //Total audio length in samples
+    // 2. A buffer of silence that we add every note into.
     std::vector<float> out(static_cast<std::size_t>(endSec * sampleRate) + 1, 0.0f);
 
     for (const NoteEvent& n : notes) {
-        const double freq = midiToFreq(n.midiNote);
+        const Instrument& in = instrumentFor(n.voice);
+        const double baseFreq = midiToFreq(n.midiNote);
         const std::size_t first = static_cast<std::size_t>(n.startSec * sampleRate);
-        const std::size_t count = static_cast<std::size_t>((n.durationSec + kRelease) * sampleRate);
+        const std::size_t count = static_cast<std::size_t>((n.durationSec + in.release) * sampleRate);
+
+        // Frequencies of the detuned copies, spread evenly from -detune to +detune.
+        // Several copies a few cents apart slowly drift in and out of phase: a "chorus" or "string section" effect.
+        std::vector<double> freqs;
+        for (int u = 0; u < in.unison; ++u) {
+            const double pos = (in.unison == 1) ? 0.0 : (2.0 * u / (in.unison - 1) - 1.0);  // -1 .. +1
+            freqs.push_back(baseFreq * std::pow(2.0, pos * in.detuneCents / 1200.0));
+        }
+        const double perCopy = in.gain * n.velocity / in.unison;
 
         for (std::size_t i = 0; i < count && first + i < out.size(); ++i) {
             const double t = static_cast<double>(i) / sampleRate;
+            const double env = adsr(t, n.durationSec, in);
+            if (env <= 0.0) continue;
 
-            const double wave = std::sin(kTwoPi * freq * t)
-                              + 0.30 * std::sin(kTwoPi * 2.0 * freq * t)
-                              + 0.12 * std::sin(kTwoPi * 3.0 * freq * t);
+            // Vibrato fades in over the first 0.4 s, so short notes stay clean.
+            const double wobble = std::sin(kTwoPi * kVibratoRate * t) * std::min(1.0, t / 0.4);
 
-            out[first + i] += static_cast<float>(wave * adsr(t, n.durationSec) * n.velocity * 0.25);
+            double sample = 0.0;
+            for (const double f : freqs) {
+                const double phase = kTwoPi * f * t + in.vibrato * f / kVibratoRate * wobble;
+                for (std::size_t h = 0; h < in.harmonics.size(); ++h) {
+                    if (in.harmonics[h] == 0.0) continue;
+                    sample += in.harmonics[h] * std::sin((h + 1) * phase);
+                }
+            }
+            out[first + i] += static_cast<float>(sample * perCopy * env);
         }
     }
 
+    // 3. Bring the whole piece to a consistent loudness (peak = 0.9), so every image is equally loud.
     float peak = 0.0f;
     for (float s : out) peak = std::max(peak, std::fabs(s));
-    if (peak > 0.9f) {
+    if (peak > 0.0f) {
         const float gain = 0.9f / peak;
-        for (float& s : out) s *= gain;
+        for (float& s : out) s *= gain;  // 'float&' = edit the original element, not a copy
     }
     return out;
 }

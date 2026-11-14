@@ -6,5 +6,7 @@
 /home/elynam/img2sound/build/CMakeFiles/color_debug.dir
 /home/elynam/img2sound/build/CMakeFiles/earth_story.dir
 /home/elynam/img2sound/build/CMakeFiles/api_server.dir
+/home/elynam/img2sound/build/CMakeFiles/cluster_debug.dir
+/home/elynam/img2sound/build/CMakeFiles/adaptive_debug.dir
 /home/elynam/img2sound/build/CMakeFiles/edit_cache.dir
 /home/elynam/img2sound/build/CMakeFiles/rebuild_cache.dir

@@ -220,6 +220,56 @@ api_server/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/api_server.dir/build.make CMakeFiles/api_server.dir/build
 .PHONY : api_server/fast
 
+#=============================================================================
+# Target rules for targets named cluster_debug
+
+# Build rule for target.
+cluster_debug: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 cluster_debug
+.PHONY : cluster_debug
+
+# fast build rule for target.
+cluster_debug/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cluster_debug.dir/build.make CMakeFiles/cluster_debug.dir/build
+.PHONY : cluster_debug/fast
+
+#=============================================================================
+# Target rules for targets named adaptive_debug
+
+# Build rule for target.
+adaptive_debug: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 adaptive_debug
+.PHONY : adaptive_debug
+
+# fast build rule for target.
+adaptive_debug/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/adaptive_debug.dir/build.make CMakeFiles/adaptive_debug.dir/build
+.PHONY : adaptive_debug/fast
+
+src/adaptive_debug.o: src/adaptive_debug.cpp.o
+.PHONY : src/adaptive_debug.o
+
+# target to build an object file
+src/adaptive_debug.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/adaptive_debug.dir/build.make CMakeFiles/adaptive_debug.dir/src/adaptive_debug.cpp.o
+.PHONY : src/adaptive_debug.cpp.o
+
+src/adaptive_debug.i: src/adaptive_debug.cpp.i
+.PHONY : src/adaptive_debug.i
+
+# target to preprocess a source file
+src/adaptive_debug.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/adaptive_debug.dir/build.make CMakeFiles/adaptive_debug.dir/src/adaptive_debug.cpp.i
+.PHONY : src/adaptive_debug.cpp.i
+
+src/adaptive_debug.s: src/adaptive_debug.cpp.s
+.PHONY : src/adaptive_debug.s
+
+# target to generate assembly for a file
+src/adaptive_debug.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/adaptive_debug.dir/build.make CMakeFiles/adaptive_debug.dir/src/adaptive_debug.cpp.s
+.PHONY : src/adaptive_debug.cpp.s
+
 src/api_server.o: src/api_server.cpp.o
 .PHONY : src/api_server.o
 
@@ -243,6 +293,30 @@ src/api_server.s: src/api_server.cpp.s
 src/api_server.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/api_server.dir/build.make CMakeFiles/api_server.dir/src/api_server.cpp.s
 .PHONY : src/api_server.cpp.s
+
+src/cluster_debug.o: src/cluster_debug.cpp.o
+.PHONY : src/cluster_debug.o
+
+# target to build an object file
+src/cluster_debug.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cluster_debug.dir/build.make CMakeFiles/cluster_debug.dir/src/cluster_debug.cpp.o
+.PHONY : src/cluster_debug.cpp.o
+
+src/cluster_debug.i: src/cluster_debug.cpp.i
+.PHONY : src/cluster_debug.i
+
+# target to preprocess a source file
+src/cluster_debug.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cluster_debug.dir/build.make CMakeFiles/cluster_debug.dir/src/cluster_debug.cpp.i
+.PHONY : src/cluster_debug.cpp.i
+
+src/cluster_debug.s: src/cluster_debug.cpp.s
+.PHONY : src/cluster_debug.s
+
+# target to generate assembly for a file
+src/cluster_debug.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cluster_debug.dir/build.make CMakeFiles/cluster_debug.dir/src/cluster_debug.cpp.s
+.PHONY : src/cluster_debug.cpp.s
 
 src/color_debug.o: src/color_debug.cpp.o
 .PHONY : src/color_debug.o
@@ -420,7 +494,9 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
+	@echo "... adaptive_debug"
 	@echo "... api_server"
+	@echo "... cluster_debug"
 	@echo "... color_debug"
 	@echo "... earth_story"
 	@echo "... image_story"
@@ -428,9 +504,15 @@ help:
 	@echo "... img2sound"
 	@echo "... melody_test"
 	@echo "... tone_test"
+	@echo "... src/adaptive_debug.o"
+	@echo "... src/adaptive_debug.i"
+	@echo "... src/adaptive_debug.s"
 	@echo "... src/api_server.o"
 	@echo "... src/api_server.i"
 	@echo "... src/api_server.s"
+	@echo "... src/cluster_debug.o"
+	@echo "... src/cluster_debug.i"
+	@echo "... src/cluster_debug.s"
 	@echo "... src/color_debug.o"
 	@echo "... src/color_debug.i"
 	@echo "... src/color_debug.s"

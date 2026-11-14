@@ -20,6 +20,13 @@ inline Terrain classifyPixel(const cv::Vec3b& hsvPx) {
 
     if (v < kBlackV) return Terrain::Dark;
 
+    if (v > 200 && s >= 40) {
+        // Warm bright glow (yellow/orange/red) -> Land/Energy
+        if (h < 45 || h >= 150) return Terrain::Land;
+        // Cool bright glow (cyan/blue/white-blue) -> IceCloud/Lightning
+        return Terrain::IceCloud;
+    }
+
     // Deep water is dark and bluish. This check MUST come before the grey check below,
     // because very dark ocean has low saturation and would otherwise count as "Other".
     if (v < kDeepWaterV && h >= 85 && h <= 140 && s >= 20) return Terrain::Ocean;

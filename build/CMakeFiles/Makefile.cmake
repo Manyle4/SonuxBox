@@ -66,4 +66,6 @@ set(CMAKE_DEPEND_INFO_FILES
   "CMakeFiles/color_debug.dir/DependInfo.cmake"
   "CMakeFiles/earth_story.dir/DependInfo.cmake"
   "CMakeFiles/api_server.dir/DependInfo.cmake"
+  "CMakeFiles/cluster_debug.dir/DependInfo.cmake"
+  "CMakeFiles/adaptive_debug.dir/DependInfo.cmake"
   )

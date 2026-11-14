@@ -1,18 +1,30 @@
-#include "earth_pipeline.h"
+#include "music_engine.h"
 #include "wav_writer.h"
 
 #include <cstddef>
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <vector>
 
 int main(int argc, char** argv) {
-    if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <earth_map> [output.wav]\n";
+    // Separate the --adaptive flag from the normal arguments, wherever it appears.
+    AnalysisMode mode = AnalysisMode::Terrain;
+    std::vector<std::string> args;
+    for (int i = 1; i < argc; ++i) {
+        const std::string a = argv[i];
+        if (a == "--adaptive") {
+            mode = AnalysisMode::Adaptive;
+        } else {
+            args.push_back(a);
+        }
+    }
+    if (args.empty()) {
+        std::cerr << "Usage: " << argv[0] << " <image> [output.wav] [--adaptive]\n";
         return 1;
     }
-    const std::string inPath = argv[1];
-    const std::string outPath = (argc >= 3) ? argv[2] : "earth_story.wav";
+    const std::string inPath = args[0];
+    const std::string outPath = (args.size() >= 2) ? args[1] : "earth_story.wav";
 
     // The JSON file shares the WAV's name: "earth_story.wav" -> "earth_story.json".
     std::string jsonPath = outPath;
@@ -28,18 +40,20 @@ int main(int argc, char** argv) {
 
     EarthResult result;
     std::string error;
-    if (!generateEarthMusic(image, 44100, result, error, /*verbose=*/true)) {
+    if (!generateMusic(image, 44100, mode, result, error, /*verbose=*/true)) {
         std::cerr << "Failed: " << error << "\n";
         return 1;
     }
 
-    std::cout << "share of the map:\n";
-    for (int i = 0; i < kTerrainCount; ++i) {
-        std::cout << "  " << terrainName(static_cast<Terrain>(i)) << ": "
-                  << 100.0 * result.analysis.overall[i] << "%\n";
+    std::cout << "analysis mode: " << modeName(mode) << "\n";
+    if (mode == AnalysisMode::Terrain) {
+        std::cout << "share of the map:\n";
+        for (int i = 0; i < kTerrainCount; ++i) {
+            std::cout << "  " << terrainName(static_cast<Terrain>(i)) << ": "
+                      << 100.0 * result.analysis.overall[i] << "%\n";
+        }
     }
-    std::cout << "=> " << (result.mood.major ? "major" : "minor") << " pentatonic, "
-              << result.mood.bpm << " BPM\n";
+    std::cout << "=> " << result.mood.scaleName << ", " << result.mood.bpm << " BPM\n";
     std::cout << "Generated " << result.notes.size() << " notes.\n";
 
     if (!writeWav16(outPath, result.audio, result.sampleRate)) {
@@ -56,3 +70,4 @@ int main(int argc, char** argv) {
     std::cout << "Wrote " << outPath << " and " << jsonPath << "\n";
     return 0;
 }
+

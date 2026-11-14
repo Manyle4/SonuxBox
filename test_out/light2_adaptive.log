@@ -1,0 +1,7 @@
+traits: signal 0.210651, background brightness 0.0980392, signal hue 60.4277 deg (colourfulness 0.158807), activity 0.494377
+melody (scale degree per column, . = rest, - = held):
+. . . . . 10 9 - 8 5 2 4 7 . . 4 - 3 - 4 6 8 - - - 7 6 4 - . . . 
+analysis mode: adaptive
+=> D mixolydian, 87.7899 BPM
+Generated 23 notes.
+Wrote test_out/light2_adaptive.wav and test_out/light2_adaptive.json

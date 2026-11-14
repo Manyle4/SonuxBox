@@ -3,7 +3,10 @@
 
 CMakeFiles/earth_story.dir/src/earth_story.cpp.o
  /home/elynam/img2sound/src/earth_story.cpp
+ /home/elynam/img2sound/src/adaptive.h
+ /home/elynam/img2sound/src/composer.h
  /home/elynam/img2sound/src/earth_pipeline.h
+ /home/elynam/img2sound/src/music_engine.h
  /home/elynam/img2sound/src/notes.h
  /home/elynam/img2sound/src/synth.h
  /home/elynam/img2sound/src/terrain.h

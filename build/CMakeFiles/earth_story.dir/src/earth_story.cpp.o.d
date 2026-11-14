@@ -1,5 +1,6 @@
 CMakeFiles/earth_story.dir/src/earth_story.cpp.o: \
  /home/elynam/img2sound/src/earth_story.cpp /usr/include/stdc-predef.h \
+ /home/elynam/img2sound/src/music_engine.h \
  /home/elynam/img2sound/src/earth_pipeline.h \
  /home/elynam/img2sound/src/terrain.h \
  /usr/include/opencv4/opencv2/opencv.hpp \
@@ -375,6 +376,8 @@ CMakeFiles/earth_story.dir/src/earth_story.cpp.o: \
  /usr/include/opencv4/opencv2/video/tracking.hpp \
  /usr/include/opencv4/opencv2/video/background_segm.hpp \
  /home/elynam/img2sound/src/notes.h /home/elynam/img2sound/src/synth.h \
+ /home/elynam/img2sound/src/adaptive.h \
+ /home/elynam/img2sound/src/composer.h \
  /home/elynam/img2sound/src/wav_writer.h /usr/include/c++/15/fstream \
  /usr/include/x86_64-linux-gnu/c++/15/bits/basic_file.h \
  /usr/include/x86_64-linux-gnu/c++/15/bits/c++io.h \

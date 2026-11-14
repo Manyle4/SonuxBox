@@ -1,0 +1,7 @@
+traits: signal 0.0474912, background brightness 0, signal hue 44.5527 deg (colourfulness 0.370356), activity 0.699971
+melody (scale degree per column, . = rest, - = held):
+. . . . . . . 11 - 8 . 5 . . 4 7 10 13 12 - - . 11 10 . 9 10 . . . . . 
+analysis mode: adaptive
+=> C# lydian, 79.2733 BPM
+Generated 20 notes.
+Wrote test_out/light1_adaptive.wav and test_out/light1_adaptive.json

@@ -1,0 +1,7 @@
+traits: signal 0.251042, background brightness 0.992157, signal hue 15.8306 deg (colourfulness 0.850031), activity 0.370667
+melody (scale degree per column, . = rest, - = held):
+13 - . . 12 11 10 9 7 4 1 2 5 6 5 3 - 2 3 5 8 9 8 7 - - - - 8 . . . 
+analysis mode: adaptive
+=> C# mixolydian, 87.7138 BPM
+Generated 29 notes.
+Wrote test_out/co_adaptive.wav and test_out/co_adaptive.json

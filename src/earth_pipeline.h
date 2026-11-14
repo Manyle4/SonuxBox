@@ -39,6 +39,8 @@ struct EarthAnalysis {
 struct EarthMood {
     bool major = true;
     double bpm = 90.0;
+    int rootMidi = kRootMidi;   // the piece's home note (reported in the JSON)
+    std::string scaleName;      // e.g. "D lydian". Empty = just use major/minor.
 };
 
 // Everything the pipeline produces, bundled together.
@@ -51,8 +53,11 @@ struct EarthResult {
     double durationSec = 0.0;
 };
 
-inline bool isLand(Terrain t) {
-    return t == Terrain::Vegetation || t == Terrain::Land || t == Terrain::IceCloud;
+inline bool isActiveData(Terrain t, bool isDarkMap) {
+    if (t == Terrain::Vegetation || t == Terrain::Land || t == Terrain::IceCloud) return true;
+    // On dark-background maps (Night Lights / Lightning), any colored 'Other' pixel is valid data
+    if (isDarkMap && t == Terrain::Other) return true;
+    return false;
 }
 
 inline EarthAnalysis analyzeEarth(const cv::Mat& image) {
@@ -61,23 +66,25 @@ inline EarthAnalysis analyzeEarth(const cv::Mat& image) {
     cv::Mat mid;
     cv::resize(image, mid, cv::Size(), scale, scale, cv::INTER_AREA);
     const int keepRows = static_cast<int>(mid.rows * (1.0 - kCropBottom));
-    const cv::Mat map = mid(cv::Rect(0, 0, mid.cols, keepRows));  // a view: no pixels are copied
+    const cv::Mat map = mid(cv::Rect(0, 0, mid.cols, keepRows));
 
     cv::Mat hsv;
     cv::cvtColor(map, hsv, cv::COLOR_BGR2HSV);
 
     EarthAnalysis result;
     result.columns.resize(kColumns);
-    std::array<double, kTerrainCount> overallCounts{};  // {} = all zeros
+    std::array<double, kTerrainCount> overallCounts{};
     double overallTotal = 0.0;
 
+    // Store row sums for each terrain type per column so we can compute landPos afterward
+    std::vector<std::array<double, kTerrainCount>> colRowSums(kColumns);
+
     for (int c = 0; c < kColumns; ++c) {
-        // Pixel range of this column. Multiply first, then divide, so no pixels are lost.
         const int x0 = c * hsv.cols / kColumns;
         const int x1 = (c + 1) * hsv.cols / kColumns;
 
         std::array<double, kTerrainCount> counts{};
-        double total = 0.0, landCount = 0.0, landRowSum = 0.0;
+        double total = 0.0;
 
         for (int y = 0; y < hsv.rows; ++y) {
             for (int x = x0; x < x1; ++x) {
@@ -85,22 +92,14 @@ inline EarthAnalysis analyzeEarth(const cv::Mat& image) {
                 const int i = static_cast<int>(t);
                 counts[i] += 1.0;
                 overallCounts[i] += 1.0;
+                colRowSums[c][i] += y;
                 total += 1.0;
-                if (isLand(t)) {
-                    landCount += 1.0;
-                    landRowSum += y;
-                }
             }
         }
 
-        ColumnStats& col = result.columns[c];  // a reference: edits change the vector's element
+        ColumnStats& col = result.columns[c];
         for (int i = 0; i < kTerrainCount; ++i) {
             col.fraction[i] = counts[i] / total;
-        }
-        col.landFraction = landCount / total;
-        if (landCount > 0.0) {
-            // Row 0 is the top of the image, so flip it: top of map = high pitch.
-            col.landPos = 1.0 - (landRowSum / landCount) / (hsv.rows - 1);
         }
         overallTotal += total;
     }
@@ -108,6 +107,33 @@ inline EarthAnalysis analyzeEarth(const cv::Mat& image) {
     for (int i = 0; i < kTerrainCount; ++i) {
         result.overall[i] = overallCounts[i] / overallTotal;
     }
+
+    // 1. Declare isDarkMap: true if more than 50% of the image is dark/black
+    const bool isDarkMap = result.overall[static_cast<int>(Terrain::Dark)] > 0.50;
+
+    // 2. Compute landFraction and landPos for each column using isDarkMap
+    for (int c = 0; c < kColumns; ++c) {
+        ColumnStats& col = result.columns[c];
+        double activeShare = 0.0;
+        double activeRowSum = 0.0;
+
+        for (int i = 0; i < kTerrainCount; ++i) {
+            const Terrain t = static_cast<Terrain>(i);
+            if (isActiveData(t, isDarkMap)) {
+                activeShare += col.fraction[i];
+                activeRowSum += colRowSums[c][i];
+            }
+        }
+
+        col.landFraction = activeShare;
+        const double totalColPixels = (hsv.cols / kColumns) * hsv.rows;
+        const double activePixels = activeShare * totalColPixels;
+
+        if (activePixels > 0.0 && hsv.rows > 1) {
+            col.landPos = 1.0 - (activeRowSum / activePixels) / (hsv.rows - 1);
+        }
+    }
+
     return result;
 }
 
@@ -117,10 +143,14 @@ inline EarthMood decideMood(const std::array<double, kTerrainCount>& overall) {
     const double ice = overall[static_cast<int>(Terrain::IceCloud)];
     const double landTotal = veg + land + ice;
 
+    const bool isDarkMap = overall[static_cast<int>(Terrain::Dark)] > 0.50;
+
     EarthMood mood;
-    // Lush (lots of vegetation compared to bare land and ice) = major. Barren = minor.
-    mood.major = landTotal > 0.0 && (veg / landTotal) >= 0.4;
-    // More land = a busier world = faster.
+    if (isDarkMap) {
+        mood.major = false; // Night lights / cosmic / lightning maps sound best in minor
+    } else {
+        mood.major = landTotal > 0.0 && (veg / landTotal) >= 0.4;
+    }
     mood.bpm = std::clamp(60.0 + 100.0 * landTotal, 60.0, 110.0);
     return mood;
 }
@@ -152,13 +182,14 @@ inline std::vector<NoteEvent> buildNotes(const EarthAnalysis& analysis, const Ea
         minPos = std::min(minPos, c.landPos);
         maxPos = std::max(maxPos, c.landPos);
     }
-    const double posRange = std::max(maxPos - minPos, 1e-6);  // never divide by zero
+    const double midPos = 0.5 * (minPos + maxPos);
+    const double posRange = std::max(maxPos - minPos, 0.15); // never divide by zero
     if (maxLand <= 0.0) return notes;                          // no land anywhere: no melody
 
     // ---- Melody: follows the land ----
     std::vector<double> stretched(kColumns);
     for (int x = 0; x < kColumns; ++x) {
-        stretched[x] = (cols[x].landPos - minPos) / posRange;  // lowest column -> 0, highest -> 1
+        stretched[x] = std::clamp(0.5 + (cols[x].landPos - midPos) / posRange, 0.0, 1.0);  // lowest column -> 0, highest -> 1
     }
     std::vector<double> smooth(kColumns);
     for (int x = 0; x < kColumns; ++x) {
@@ -209,6 +240,32 @@ inline std::vector<NoteEvent> buildNotes(const EarthAnalysis& analysis, const Ea
         bass.voice = 1;  // bass
         notes.push_back(bass);
     }
+
+    /// ---- Harmony Pad: warm open acoustic voicing per bar ----
+    for (int bar = 0; bar < kColumns / kBarColumns; ++bar) {
+        double ocean = 0.0;
+        for (int c = bar * kBarColumns; c < (bar + 1) * kBarColumns; ++c) {
+            ocean += cols[c].fraction[static_cast<int>(Terrain::Ocean)];
+        }
+        ocean /= kBarColumns;
+
+        // Match the bass movement: home chord (0) on ocean, fifth chord (3 in pentatonic = G/E) on land
+        int baseDegree = (ocean > 0.5) ? 0 : 3;
+
+        // Open voicing: Root (0), Fifth (3), and Octave+Third (7)
+        // Spreading them across octaves eliminates muddiness!
+        int chordOffsets[3] = {0, 3, 7};
+        for (int offset : chordOffsets) {
+            NoteEvent pad;
+            pad.startSec = bar * kBarColumns * stepSec;
+            pad.durationSec = kBarColumns * stepSec * 0.98;
+            pad.midiNote = scaleDegreeToMidiMode(kRootMidi + 12, baseDegree + offset, mood.major);
+            pad.velocity = 0.14f; // Softer background bed so the melody shines
+            pad.voice = 2;
+            notes.push_back(pad);
+        }
+    }
+
     return notes;
 }
 
@@ -234,9 +291,14 @@ inline std::string buildJson(const std::string& imageName, const std::string& au
     f << "{\n";
     f << "  \"image\": \"" << jsonEscape(imageName) << "\",\n";
     f << "  \"audioUrl\": \"" << jsonEscape(audioUrl) << "\",\n";
-    f << "  \"mode\": \"" << (r.mood.major ? "major" : "minor") << "\",\n";
+    
+    const std::string modeText = r.mood.scaleName.empty()
+                                     ? std::string(r.mood.major ? "major" : "minor")
+                                     : r.mood.scaleName;
+    f << "  \"mode\": \"" << jsonEscape(modeText) << "\",\n";
+
     f << "  \"bpm\": " << r.mood.bpm << ",\n";
-    f << "  \"rootMidi\": " << kRootMidi << ",\n";
+    f << "  \"rootMidi\": " << r.mood.rootMidi << ",\n";
     f << "  \"columns\": " << kColumns << ",\n";
     f << "  \"stepSec\": " << stepSec << ",\n";
     f << "  \"durationSec\": " << r.durationSec << ",\n";
@@ -262,7 +324,7 @@ inline std::string buildJson(const std::string& imageName, const std::string& au
         const NoteEvent& n = r.notes[i];
         f << "    {\"start\": " << n.startSec << ", \"dur\": " << n.durationSec
           << ", \"midi\": " << n.midiNote << ", \"vel\": " << n.velocity
-          << ", \"voice\": \"" << (n.voice == 1 ? "bass" : "melody") << "\"}"
+          << ", \"voice\": \"" << (n.voice == 1 ? "bass" : (n.voice == 2 ? "pad" : "melody")) << "\"}"
           << (i + 1 < r.notes.size() ? "," : "") << "\n";
     }
     f << "  ]\n";

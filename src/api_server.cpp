@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+#include <cstdlib>
+
 constexpr int kPort = 8080;
 constexpr int kSampleRate = 44100;
 constexpr std::size_t kMaxUploadBytes = 20 * 1024 * 1024;  // refuse uploads over 20 MB
@@ -26,7 +28,21 @@ int main() {
     const std::string outputDir = "output";
     std::filesystem::create_directories(outputDir);  // does nothing if it already exists
 
+    int port = kPort;
+    if (const char* envPort = std::getenv("PORT")) {
+        port = std::stoi(envPort);
+    }
+
     httplib::Server svr;
+    svr.set_default_headers({
+        {"Access-Control-Allow-Origin", "*"},
+        {"Access-Control-Allow-Methods", "GET, POST, OPTIONS"},
+        {"Access-Control-Allow-Headers", "Content-Type"}
+    });
+    svr.Options(".*", [](const httplib::Request&, httplib::Response& res) {
+        res.status = 204;
+    });
+
     svr.set_payload_max_length(kMaxUploadBytes);
     svr.set_file_extension_and_mimetype_mapping("wav", "audio/wav");
     if (!svr.set_mount_point("/audio", outputDir)) {
@@ -87,14 +103,14 @@ int main() {
         }
     });
 
-    std::cout << "Server running on port " << kPort << ".\n"
-              << "  GET  http://localhost:" << kPort << "/api/health\n"
-              << "  POST http://localhost:" << kPort << "/api/analyze   (body = image bytes)\n"
-              << "  GET  http://localhost:" << kPort << "/audio/<id>.wav\n"
+    std::cout << "Server running on port " << port << ".\n"
+              << "  GET  http://localhost:" << port << "/api/health\n"
+              << "  POST http://localhost:" << port << "/api/analyze   (body = image bytes)\n"
+              << "  GET  http://localhost:" << port << "/audio/<id>.wav\n"
               << "Press Ctrl+C to stop.\n";
 
-    if (!svr.listen("0.0.0.0", kPort)) {
-        std::cerr << "Could not start the server. Is port " << kPort << " already in use?\n";
+    if (!svr.listen("0.0.0.0", port)) {
+        std::cerr << "Could not start the server. Is port " << port << " already in use?\n";
         return 1;
     }
     return 0;

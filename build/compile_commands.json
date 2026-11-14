@@ -46,5 +46,17 @@
   "command": "/usr/bin/c++  -I/home/elynam/img2sound/third_party/httplib -isystem /usr/include/opencv4 -std=gnu++17 -o CMakeFiles/api_server.dir/src/api_server.cpp.o -c /home/elynam/img2sound/src/api_server.cpp",
   "file": "/home/elynam/img2sound/src/api_server.cpp",
   "output": "CMakeFiles/api_server.dir/src/api_server.cpp.o"
+},
+{
+  "directory": "/home/elynam/img2sound/build",
+  "command": "/usr/bin/c++  -isystem /usr/include/opencv4 -std=gnu++17 -o CMakeFiles/cluster_debug.dir/src/cluster_debug.cpp.o -c /home/elynam/img2sound/src/cluster_debug.cpp",
+  "file": "/home/elynam/img2sound/src/cluster_debug.cpp",
+  "output": "CMakeFiles/cluster_debug.dir/src/cluster_debug.cpp.o"
+},
+{
+  "directory": "/home/elynam/img2sound/build",
+  "command": "/usr/bin/c++  -isystem /usr/include/opencv4 -std=gnu++17 -o CMakeFiles/adaptive_debug.dir/src/adaptive_debug.cpp.o -c /home/elynam/img2sound/src/adaptive_debug.cpp",
+  "file": "/home/elynam/img2sound/src/adaptive_debug.cpp",
+  "output": "CMakeFiles/adaptive_debug.dir/src/adaptive_debug.cpp.o"
 }
 ]

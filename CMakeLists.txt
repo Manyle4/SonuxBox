@@ -37,3 +37,11 @@ target_link_libraries(earth_story PRIVATE ${OpenCV_LIBS})
 add_executable(api_server src/api_server.cpp)
 target_include_directories(api_server PRIVATE third_party/httplib ${OpenCV_INCLUDE_DIRS})
 target_link_libraries(api_server PRIVATE Threads::Threads ${OpenCV_LIBS})
+
+add_executable(cluster_debug src/cluster_debug.cpp)
+target_include_directories(cluster_debug PRIVATE ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(cluster_debug PRIVATE ${OpenCV_LIBS})
+
+add_executable(adaptive_debug src/adaptive_debug.cpp)
+target_include_directories(adaptive_debug PRIVATE ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(adaptive_debug PRIVATE ${OpenCV_LIBS})
