@@ -7,12 +7,12 @@ export const API_URL = (
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 
 export type AnalysisMode = 'adaptive' | 'terrain'
-export type Voice = 'melody' | 'bass' | 'pad'
+export type Voice = 'melody' | 'bass' | 'pad' | 'perc'
 
 export interface Note {
   start: number // seconds
   dur: number
-  midi: number
+  midi: number // 0 for percussion
   vel: number // 0..1
   voice: Voice
 }
@@ -52,19 +52,26 @@ async function readError(res: Response): Promise<string> {
   return `Server error (${res.status})`
 }
 
-export async function analyze(file: Blob, name: string, mode: AnalysisMode, signal?: AbortSignal) {
+export async function analyze(file: Blob, name: string, mode: AnalysisMode, crop?: number, signal?: AbortSignal) {
   const form = new FormData()
   form.append('image', file, name)
   form.append('mode', mode)
+  if (crop !== undefined) form.append('crop', String(crop))
 
   const res = await fetch(`${API_URL}/api/analyze`, { method: 'POST', body: form, signal })
   if (!res.ok) throw new Error(await readError(res))
   return (await res.json()) as AnalyzeResult
 }
 
-// Grab the WAV right away: Heroku wipes its disk on restarts, so the URL won't last.
-export async function fetchAudio(audioUrl: string, signal?: AbortSignal) {
-  const res = await fetch(`${API_URL}${audioUrl}`, { signal })
-  if (!res.ok) throw new Error(await readError(res))
-  return res.blob()
+// Same piece at a different speed: every time stretches by 1/rate.
+export function atSpeed(r: AnalyzeResult, rate: number): AnalyzeResult {
+  if (rate === 1) return r
+  return {
+    ...r,
+    bpm: r.bpm * rate,
+    stepSec: r.stepSec / rate,
+    musicSec: r.musicSec / rate,
+    durationSec: r.durationSec / rate,
+    notes: r.notes.map((n) => ({ ...n, start: n.start / rate, dur: n.dur / rate })),
+  }
 }

@@ -4,9 +4,9 @@ interface Props {
   result: AnalyzeResult
   playing: boolean
   time: number
+  duration: number
   onToggle: () => void
-  audioUrl: string
-  fileName: string
+  onDownload: () => void
 }
 
 const clock = (sec: number) => {
@@ -14,7 +14,7 @@ const clock = (sec: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
-export function PlayerBar({ result, playing, time, onToggle, audioUrl, fileName }: Props) {
+export function PlayerBar({ result, playing, time, duration, onToggle, onDownload }: Props) {
   return (
     <div className="playerbar">
       <button className="play" onClick={onToggle} aria-label={playing ? 'Pause' : 'Play'}>
@@ -30,17 +30,17 @@ export function PlayerBar({ result, playing, time, onToggle, audioUrl, fileName 
         )}
       </button>
       <span className="clock">
-        {clock(time)} / {clock(result.durationSec)}
+        {clock(time)} / {clock(duration)}
       </span>
       <ul className="facts">
         <li><b>{result.scale}</b></li>
         <li>{Math.round(result.bpm)} BPM</li>
-        <li>{result.notes.length} notes</li>
+        <li>{result.notes.filter((n) => n.voice !== 'perc').length} notes</li>
         <li>{result.analysisMode}</li>
       </ul>
-      <a className="download" href={audioUrl} download={fileName}>
+      <button className="download" onClick={onDownload}>
         Download WAV
-      </a>
+      </button>
     </div>
   )
 }

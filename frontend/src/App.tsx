@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { analyze, API_URL, fetchAudio, MAX_UPLOAD_BYTES, type AnalysisMode, type AnalyzeResult } from './api'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { analyze, API_URL, atSpeed, MAX_UPLOAD_BYTES, type AnalysisMode, type AnalyzeResult, type Voice } from './api'
+import { useAudioEngine } from './audio/useAudioEngine'
 import { Dropzone } from './components/Dropzone'
 import { Gallery } from './components/Gallery'
+import { Mixer } from './components/Mixer'
 import { MapView } from './components/MapView'
 import { ModeToggle } from './components/ModeToggle'
 import { PianoRoll } from './components/PianoRoll'
 import { PlayerBar } from './components/PlayerBar'
 import { describePiece } from './describe'
 import { TRACKS, trackUrl, type Track } from './tracks'
-import { usePlayback } from './usePlayback'
 
 interface Source {
   blob: Blob
@@ -24,14 +25,19 @@ export default function App() {
   const [source, setSource] = useState<Source | null>(null)
   const [status, setStatus] = useState<Status>('idle')
   const [result, setResult] = useState<AnalyzeResult | null>(null)
-  const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [rate, setRate] = useState(1)
+  const [muted, setMuted] = useState<Set<Voice>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [slow, setSlow] = useState(false) // eco dynos nap; the first call can take a while
   const [announce, setAnnounce] = useState('') // read out by screen readers
   const abortRef = useRef<AbortController | null>(null)
   const stageRef = useRef<HTMLElement>(null)
 
-  const { playing, time, toggle, seek } = usePlayback(audioUrl)
+  // Everything downstream sees the piece at the chosen speed.
+  const piece = useMemo(() => (result ? atSpeed(result, rate) : null), [result, rate])
+  const gridSec = piece ? piece.columns * piece.stepSec : 0
+  const audio = useAudioEngine(status === 'ready' && piece ? piece.notes : null, gridSec, muted)
+  const { playing, time, toggle, seek } = audio
 
   // Wake the server while people look around, so their first track is quick.
   useEffect(() => {
@@ -51,13 +57,8 @@ export default function App() {
     const slowTimer = setTimeout(() => setSlow(true), 4000)
 
     try {
-      const res = await analyze(src.blob, src.name, m, ctrl.signal)
-      const wav = await fetchAudio(res.audioUrl, ctrl.signal)
+      const res = await analyze(src.blob, src.name, m, src.track?.crop, ctrl.signal)
       setResult(res)
-      setAudioUrl((old) => {
-        if (old) URL.revokeObjectURL(old)
-        return URL.createObjectURL(wav)
-      })
       setStatus('ready')
       setAnnounce(`${title} is ready. Press space to play, or focus the image to explore it slice by slice.`)
     } catch (e) {
@@ -134,7 +135,26 @@ export default function App() {
   const track = source?.track ?? null
   const title = track?.title ?? source?.name ?? ''
   const baseName = (source?.name ?? 'map').replace(/\.[^.]+$/, '')
-  const ready = status === 'ready' && result && audioUrl
+  const ready = status === 'ready' && piece && audio.ready
+
+  const toggleLayer = (v: Voice) =>
+    setMuted((old) => {
+      const next = new Set(old)
+      if (next.has(v)) next.delete(v)
+      else next.add(v)
+      return next
+    })
+
+  const download = () => {
+    const blob = audio.exportWav()
+    if (!blob) return
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${baseName}-${piece?.analysisMode ?? 'sonux'}.wav`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
 
   return (
     <div className="app">
@@ -175,10 +195,10 @@ export default function App() {
                     </a>
                   )}
                 </div>
-                {loading && (
+                {(loading || (status === 'ready' && audio.rendering)) && (
                   <span className="status">
                     <span className="spinner" aria-hidden="true" />
-                    {slow ? 'Waking the server up, this can take ~20 s…' : 'Composing…'}
+                    {loading ? (slow ? 'Waking the server up, this can take ~20 s…' : 'Composing…') : 'Rendering sound…'}
                   </span>
                 )}
               </div>
@@ -188,7 +208,7 @@ export default function App() {
               <MapView
                 imageUrl={source.previewUrl}
                 imageAlt={track ? `${track.title} map. ${track.about}` : `Your image, ${source.name}`}
-                result={status === 'ready' ? result : null}
+                result={status === 'ready' ? piece : null}
                 time={time}
                 playing={playing}
                 onSeek={seek}
@@ -196,31 +216,28 @@ export default function App() {
 
               {ready && (
                 <>
-                  <PlayerBar
-                    result={result}
-                    playing={playing}
-                    time={time}
-                    onToggle={toggle}
-                    audioUrl={audioUrl}
-                    fileName={`${baseName}-${result.analysisMode}.wav`}
-                  />
-                  <PianoRoll result={result} time={time} onSeek={seek} />
+                  <PlayerBar result={piece} playing={playing} time={time} duration={audio.duration}
+                    onToggle={toggle} onDownload={download} />
+                  <Mixer muted={muted} onToggle={toggleLayer} rate={rate} onRate={setRate}
+                    hasPerc={piece.notes.some((n) => n.voice === 'perc')} />
+                  <PianoRoll result={piece} time={time} onSeek={seek} muted={muted} />
 
                   <section className="hearing" aria-labelledby="hearing-title">
                     <h3 id="hearing-title">What you're hearing</h3>
                     {track && <p className="about">{track.about} {track.listen}</p>}
-                    <p>{describePiece(result, title)}</p>
+                    <p>{describePiece(piece, title)}</p>
                     <details>
                       <summary>How the image becomes music</summary>
                       <ul>
-                        <li>The image is read left to right in {result.columns} slices, one per beat.</li>
+                        <li>The image is read left to right in {piece.columns} slices, one per beat. The sound moves from your left ear to your right as it goes.</li>
                         <li>Where the signal sits higher in the image, the melody plays higher notes.</li>
                         <li>Stronger signal plays louder; quiet slices are rests.</li>
                         <li>
-                          {result.analysisMode === 'adaptive'
+                          {piece.analysisMode === 'adaptive'
                             ? "The image's main colour picks the key, and how busy it is picks the scale and tempo."
                             : 'Greener maps play in a major key; more land makes the tempo faster.'}
                         </li>
+                        <li>Sudden jumps in the signal get a drum hit.</li>
                         <li>Hover over, drag across, or arrow through the image to hear one slice at a time.</li>
                       </ul>
                     </details>

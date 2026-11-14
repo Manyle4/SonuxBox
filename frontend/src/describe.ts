@@ -56,6 +56,7 @@ export function describePiece(r: AnalyzeResult, title: string) {
   const cols = r.columnStats
   const infos = cols.map((_, i) => columnInfo(r, i))
   const restCount = infos.filter((c) => c.rest).length
+  const hits = r.notes.filter((n) => n.voice === 'perc').length
 
   // Longest run of sounding columns = the busiest stretch of the map.
   let best = { from: 0, to: -1 }
@@ -89,6 +90,9 @@ export function describePiece(r: AnalyzeResult, title: string) {
       ? `About ${Math.round((restCount / r.columns) * 100)}% of the slices are quiet enough that the melody rests.`
       : 'There is signal in every slice, so the melody never rests.',
     'A bass note and soft chords hold each bar together underneath.',
+    hits > 0
+      ? `${hits} drum ${hits === 1 ? 'hit marks' : 'hits mark'} places where the signal jumps up suddenly.`
+      : '',
   ]
   return sentences.filter(Boolean).join(' ')
 }

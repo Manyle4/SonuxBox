@@ -1,26 +1,30 @@
 import type { MouseEvent } from 'react'
-import type { AnalyzeResult } from '../api'
+import type { AnalyzeResult, Voice } from '../api'
 
 interface Props {
   result: AnalyzeResult
   time: number
   onSeek: (sec: number) => void
+  muted?: Set<Voice>
 }
 
 const W = 1000
 const H = 220
 
-export function PianoRoll({ result, time, onSeek }: Props) {
+export function PianoRoll({ result, time, onSeek, muted }: Props) {
   const total = Math.max(result.musicSec, result.columns * result.stepSec)
-  const midis = result.notes.map((n) => n.midi)
+  const pitched = result.notes.filter((n) => n.voice !== 'perc')
+  const hits = result.notes.filter((n) => n.voice === 'perc')
+  const drumH = hits.length ? 18 : 0 // a lane along the bottom for drum hits
+  const midis = pitched.map((n) => n.midi)
   const lo = Math.min(...midis) - 1
   const hi = Math.max(...midis) + 1
-  const rowH = H / (hi - lo + 1)
+  const rowH = (H - drumH) / (hi - lo + 1)
   const x = (sec: number) => (sec / total) * W
 
   // Draw pad first and melody last, so the melody sits on top.
   const order = { pad: 0, bass: 1, melody: 2 }
-  const notes = [...result.notes].sort((a, b) => order[a.voice] - order[b.voice])
+  const notes = [...pitched].sort((a, b) => order[a.voice as 'pad' | 'bass' | 'melody'] - order[b.voice as 'pad' | 'bass' | 'melody'])
 
   const seekFromClick = (e: MouseEvent<SVGSVGElement>) => {
     const box = e.currentTarget.getBoundingClientRect()
@@ -40,7 +44,7 @@ export function PianoRoll({ result, time, onSeek }: Props) {
           return (
             <rect
               key={i}
-              className={`note ${n.voice}${active ? ' active' : ''}`}
+              className={`note ${n.voice}${active ? ' active' : ''}${muted?.has(n.voice) ? ' muted' : ''}`}
               x={x(n.start)}
               y={(hi - n.midi) * rowH + 1}
               width={Math.max(x(n.dur) - 1.5, 2)}
@@ -48,6 +52,13 @@ export function PianoRoll({ result, time, onSeek }: Props) {
               rx={2}
               opacity={0.35 + 0.65 * n.vel}
             />
+          )
+        })}
+        {hits.map((n, i) => {
+          const active = time > 0 && time >= n.start && time < n.start + Math.max(n.dur, 0.15)
+          return (
+            <rect key={`h${i}`} className={`note perc${active ? ' active' : ''}${muted?.has('perc') ? ' muted' : ''}`} x={x(n.start)} y={H - drumH + 3}
+              width={6} height={drumH - 6} rx={2} opacity={0.4 + 0.6 * n.vel} />
           )
         })}
         {time > 0 && (
@@ -58,6 +69,7 @@ export function PianoRoll({ result, time, onSeek }: Props) {
         <span className="key melody">Melody</span>
         <span className="key bass">Bass</span>
         <span className="key pad">Pad</span>
+        {hits.length > 0 && <span className="key perc">Drums</span>}
       </figcaption>
     </figure>
   )

@@ -6,6 +6,7 @@ export interface Track {
   about: string // what the data shows
   listen: string // what to listen for
   mode: AnalysisMode // the mode that suits this image best
+  crop?: number // share of the bottom to ignore; 0 for images with no legend strip
   source: { label: string; url: string }
 }
 
@@ -68,6 +69,7 @@ export const TRACKS: Track[] = [
     about: 'A river of moisture in the sky reaching the US west coast, from an Earth system model.',
     listen: 'Terrain mode follows the bright cloud bands: higher in the image plays higher notes.',
     mode: 'terrain',
+    crop: 0,
     source: { label: 'NASA SVS: A 3D View of an Atmospheric River', url: 'https://svs.gsfc.nasa.gov/4960/' },
   },
   {
@@ -76,6 +78,7 @@ export const TRACKS: Track[] = [
     about: 'Forest canopy height over Africa, measured by the GEDI laser on the ISS.',
     listen: 'Terrain mode follows the land: land higher up the image plays higher notes.',
     mode: 'terrain',
+    crop: 0.08, // just the small legend in the corner
     source: { label: 'NASA SVS: GEDI Forest Height', url: 'https://svs.gsfc.nasa.gov/4950/' },
   },
 ]

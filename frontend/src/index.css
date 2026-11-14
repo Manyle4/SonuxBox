@@ -156,3 +156,22 @@ footer { margin-top: 28px; color: var(--muted); font-size: 0.85rem; text-align: 
 .hearing ul { margin: 8px 0 0; padding-left: 20px; }
 footer p { margin: 4px 0; }
 footer a { color: var(--muted); }
+
+/* ---- mixer + drums ---- */
+:root { --perc: #e2e8f0; }
+.note.perc { fill: var(--perc); }
+.key.perc::before { background: var(--perc); }
+.mixer { display: flex; flex-wrap: wrap; gap: 10px 24px; margin: 0 0 14px; }
+.mixer .group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mixer .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-right: 2px; }
+.mixer button { font-size: 0.8rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); color: var(--text); }
+.mixer .layer::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+.mixer .layer.melody::before { background: var(--melody); }
+.mixer .layer.bass::before { background: var(--bass); }
+.mixer .layer.pad::before { background: var(--pad); }
+.mixer .layer.perc::before { background: var(--perc); }
+.mixer .layer.off { color: var(--muted); text-decoration: line-through; opacity: 0.7; }
+.mixer .layer.off::before { background: var(--line); }
+.mixer .rate.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.download { background: none; cursor: pointer; }
+.roll .note.muted { opacity: 0.12 !important; }
