@@ -9,7 +9,7 @@ import { ModeToggle } from './components/ModeToggle'
 import { PianoRoll } from './components/PianoRoll'
 import { PlayerBar } from './components/PlayerBar'
 import { describePiece } from './describe'
-import { TRACKS, trackUrl, type Track } from './tracks'
+import { prerendered, TRACKS, trackUrl, type Track } from './tracks'
 
 interface Source {
   blob: Blob
@@ -57,7 +57,11 @@ export default function App() {
     const slowTimer = setTimeout(() => setSlow(true), 4000)
 
     try {
-      const res = await analyze(src.blob, src.name, m, src.track?.crop, ctrl.signal)
+      // Jukebox tracks are ready-made; only your own images need the engine.
+      const res =
+        (src.track && (await prerendered(src.track.id, m))) ||
+        (await analyze(src.blob, src.name, m, src.track?.crop, ctrl.signal))
+      if (ctrl.signal.aborted) return
       setResult(res)
       setStatus('ready')
       setAnnounce(`${title} is ready. Press space to play, or focus the image to explore it slice by slice.`)
