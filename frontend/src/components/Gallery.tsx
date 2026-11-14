@@ -1,4 +1,4 @@
-import { SAMPLES, sampleUrl } from '../samples'
+import { TRACKS, trackUrl } from '../tracks'
 
 interface Props {
   activeId: string | null
@@ -8,19 +8,22 @@ interface Props {
 
 export function Gallery({ activeId, onPick, disabled }: Props) {
   return (
-    <div className="gallery">
-      {SAMPLES.map((s) => (
-        <button
-          key={s.id}
-          className={`sample${activeId === s.id ? ' active' : ''}`}
-          onClick={() => onPick(s.id)}
-          disabled={disabled}
-          title={s.blurb}
-        >
-          <img src={sampleUrl(s.id)} alt="" loading="lazy" />
-          <span>{s.label}</span>
-        </button>
+    <ul className="gallery" aria-label="Earth Jukebox tracks">
+      {TRACKS.map((t) => (
+        <li key={t.id}>
+          <button
+            className={`sample${activeId === t.id ? ' active' : ''}`}
+            onClick={() => onPick(t.id)}
+            disabled={disabled}
+            aria-pressed={activeId === t.id}
+            aria-describedby={`track-${t.id}`}
+          >
+            <img src={trackUrl(t.id)} alt="" loading="lazy" />
+            <span>{t.title}</span>
+          </button>
+          <span id={`track-${t.id}`} className="sr-only">{t.about}</span>
+        </li>
       ))}
-    </div>
+    </ul>
   )
 }

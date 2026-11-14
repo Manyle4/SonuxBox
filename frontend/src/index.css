@@ -136,3 +136,23 @@ footer { margin-top: 28px; color: var(--muted); font-size: 0.85rem; text-align: 
   .gallery { grid-template-columns: 1fr 1fr; }
   .download { margin-left: 0; }
 }
+
+/* ---- jukebox + accessibility additions ---- */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.gallery { list-style: none; margin: 0; padding: 0; }
+.gallery li { display: contents; }
+.inputs h2:first-child { margin-top: 0; }
+.source { display: inline-block; margin-top: 2px; font-size: 0.8rem; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.source:hover { color: var(--accent); }
+.band.explore { background: rgba(246, 173, 85, 0.2); border-color: rgba(246, 173, 85, 0.7); }
+.strength div.explore { background: var(--bass); }
+.map:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.hearing { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.hearing h3 { margin: 0 0 8px; font-size: 1rem; }
+.hearing p { margin: 0 0 10px; color: var(--text); max-width: 70ch; }
+.hearing .about { color: var(--muted); }
+.hearing details { color: var(--muted); font-size: 0.9rem; }
+.hearing summary { cursor: pointer; color: var(--text); }
+.hearing ul { margin: 8px 0 0; padding-left: 20px; }
+footer p { margin: 4px 0; }
+footer a { color: var(--muted); }
