@@ -10,7 +10,7 @@ COPY src src
 COPY third_party third_party
 
 # Only the server is needed here, not the debug tools.
-RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSONUX_TOOLS=OFF \
     && cmake --build build --target api_server -j"$(nproc)"
 
 EXPOSE 8080

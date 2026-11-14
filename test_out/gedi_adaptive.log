@@ -1,7 +1,0 @@
-traits: signal 0.213709, background brightness 0.00784314, signal hue 143.241 deg (colourfulness 0.576285), activity 1
-melody (scale degree per column, . = rest, - = held):
-. . . . . . . . . . . 10 - 11 12 13 - - 11 10 9 8 9 10 11 . . . . . . . 
-analysis mode: adaptive
-=> F dorian, 103.234 BPM
-Generated 19 notes.
-Wrote test_out/gedi_adaptive.wav and test_out/gedi_adaptive.json
