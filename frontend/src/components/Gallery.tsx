@@ -18,7 +18,8 @@ export function Gallery({ activeId, onPick, disabled }: Props) {
             aria-pressed={activeId === t.id}
             aria-describedby={`track-${t.id}`}
           >
-            <img src={trackUrl(t.id)} alt="" loading="lazy" />
+            <img src={trackUrl(t)} alt="" loading="lazy" />
+            {t.frames && <em className="badge">Time-lapse</em>}
             <span>{t.title}</span>
           </button>
           <span id={`track-${t.id}`} className="sr-only">{t.about}</span>

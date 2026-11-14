@@ -15,6 +15,7 @@ export interface Note {
   midi: number // 0 for percussion
   vel: number // 0..1
   voice: Voice
+  pos?: number // 0..1 across its image, for stereo panning (set when frames are joined)
 }
 
 export interface ColumnStat {

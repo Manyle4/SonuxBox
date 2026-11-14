@@ -96,3 +96,29 @@ export function describePiece(r: AnalyzeResult, title: string) {
   ]
   return sentences.filter(Boolean).join(' ')
 }
+
+// Time-lapse: compare the frames, since the change is the point.
+export function describeSeries(frames: { result: AnalyzeResult; label: string }[], title: string) {
+  const stats = frames.map((f) => {
+    const land = f.result.columnStats.map((c) => c.land)
+    return {
+      label: f.label,
+      scale: f.result.scale,
+      mean: land.reduce((a, b) => a + b, 0) / land.length,
+      melody: f.result.notes.filter((n) => n.voice === 'melody').length,
+    }
+  })
+  const first = stats[0]
+  const last = stats[stats.length - 1]
+  const change = first.mean > 0 ? ((last.mean - first.mean) / first.mean) * 100 : 0
+
+  return [
+    `${title}: ${frames.length} images played back to back, ${stats.map((s) => s.label).join(', then ')}.`,
+    'Each one is read left to right, one slice per beat.',
+    ...stats.map((s) => `${s.label} plays in ${s.scale} with ${s.melody} melody notes.`),
+    Math.abs(change) < 2
+      ? `Overall, the signal barely changes from ${first.label} to ${last.label}.`
+      : `From ${first.label} to ${last.label} the overall signal ${change > 0 ? 'rises' : 'falls'} by about ` +
+        `${Math.round(Math.abs(change))}%, and the melody goes from ${first.melody} to ${last.melody} notes.`,
+  ].join(' ')
+}

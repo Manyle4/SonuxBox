@@ -66,6 +66,28 @@
     }
   },
   {
+    "id": "ukraine",
+    "title": "Ukraine lights, 2012 → 2023",
+    "about": "Night lights over Ukraine in 2012, then in 2023, after years of war and power cuts.",
+    "listen": "Two pieces back to back: listen for the 2023 melody thinning out as the lights go dark.",
+    "mode": "adaptive",
+    "crop": 0,
+    "frames": [
+      {
+        "id": "ukraine2012",
+        "label": "2012"
+      },
+      {
+        "id": "ukraine2023",
+        "label": "2023"
+      }
+    ],
+    "source": {
+      "label": "NASA SVS: Change in Night Lights 2012–2023",
+      "url": "https://svs.gsfc.nasa.gov/5276/"
+    }
+  },
+  {
     "id": "atmosphere",
     "title": "Atmospheric river",
     "about": "A river of moisture in the sky reaching the US west coast, from an Earth system model.",
@@ -87,6 +109,42 @@
     "source": {
       "label": "NASA SVS: GEDI Forest Height",
       "url": "https://svs.gsfc.nasa.gov/4950/"
+    }
+  },
+  {
+    "id": "lightning",
+    "title": "Lightning",
+    "about": "Lightning strikes over a year, detected from the International Space Station (LIS sensor).",
+    "listen": "Bursts of storms over the tropics come through as sudden notes and drum hits.",
+    "mode": "terrain",
+    "crop": 0,
+    "source": {
+      "label": "NASA SVS: Lightning Events Detected from the ISS",
+      "url": "https://svs.gsfc.nasa.gov/5011/"
+    }
+  },
+  {
+    "id": "co2",
+    "title": "Carbon dioxide",
+    "about": "Carbon dioxide drifting over western North America in a high-resolution NASA model (DYAMOND).",
+    "listen": "Where the CO₂ plumes stand out from the background, the melody comes in.",
+    "mode": "adaptive",
+    "crop": 0,
+    "source": {
+      "label": "NASA SVS: DYAMOND Global Carbon Dioxide",
+      "url": "https://svs.gsfc.nasa.gov/5196/"
+    }
+  },
+  {
+    "id": "ocean2",
+    "title": "Perpetual Ocean",
+    "about": "Ocean currents swirling around the Pacific, from the Perpetual Ocean 2 model run.",
+    "listen": "Terrain mode follows the land and sea: the melody traces the coastlines around the Pacific.",
+    "mode": "terrain",
+    "crop": 0,
+    "source": {
+      "label": "NASA SVS: Perpetual Ocean 2",
+      "url": "https://svs.gsfc.nasa.gov/5425/"
     }
   }
 ]

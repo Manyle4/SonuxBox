@@ -8,7 +8,10 @@ const tracks = JSON.parse(await readFile(new URL('../src/tracks.json', import.me
 const out = new URL('../public/tracks/', import.meta.url)
 await mkdir(out, { recursive: true })
 
-for (const t of tracks) {
+// A time-lapse track has several frames; each gets its own result.
+const jobs = tracks.flatMap((t) => (t.frames ?? [{ id: t.id }]).map((f) => ({ id: f.id, crop: t.crop })))
+
+for (const t of jobs) {
   for (const mode of ['adaptive', 'terrain']) {
     const form = new FormData()
     const bytes = await readFile(new URL(`../public/samples/${t.id}.jpg`, import.meta.url))

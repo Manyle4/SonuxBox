@@ -6,12 +6,13 @@ interface Props {
   time: number
   onSeek: (sec: number) => void
   muted?: Set<Voice>
+  marks?: { at: number; label: string }[] // frame starts in a time-lapse
 }
 
 const W = 1000
 const H = 220
 
-export function PianoRoll({ result, time, onSeek, muted }: Props) {
+export function PianoRoll({ result, time, onSeek, muted, marks = [] }: Props) {
   const total = Math.max(result.musicSec, result.columns * result.stepSec)
   const pitched = result.notes.filter((n) => n.voice !== 'perc')
   const hits = result.notes.filter((n) => n.voice === 'perc')
@@ -61,10 +62,18 @@ export function PianoRoll({ result, time, onSeek, muted }: Props) {
               width={6} height={drumH - 6} rx={2} opacity={0.4 + 0.6 * n.vel} />
           )
         })}
+        {marks.map((m) => (
+          <line key={m.label} className="framemark" x1={x(m.at)} x2={x(m.at)} y1={0} y2={H} vectorEffect="non-scaling-stroke" />
+        ))}
         {time > 0 && (
           <line className="rollhead" x1={x(time)} x2={x(time)} y1={0} y2={H} vectorEffect="non-scaling-stroke" />
         )}
       </svg>
+      {marks.map((m) => (
+        <span key={m.label} className="framelabel" style={{ left: `${(m.at / total) * 100}%` }} aria-hidden="true">
+          {m.label}
+        </span>
+      ))}
       <figcaption>
         <span className="key melody">Melody</span>
         <span className="key bass">Bass</span>

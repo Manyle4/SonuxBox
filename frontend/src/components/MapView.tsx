@@ -6,6 +6,7 @@ import { playColumn } from '../explore'
 interface Props {
   imageUrl: string
   imageAlt: string
+  label?: string // frame label for time-lapses, e.g. "2012"
   result: AnalyzeResult | null
   time: number
   playing: boolean
@@ -14,7 +15,7 @@ interface Props {
 
 // The image with a playhead sweeping left to right, one column per eighth note.
 // It's also a slider: hover, drag or use the arrow keys to hear one slice at a time.
-export function MapView({ imageUrl, imageAlt, result, time, playing, onSeek }: Props) {
+export function MapView({ imageUrl, imageAlt, label, result, time, playing, onSeek }: Props) {
   const [explore, setExplore] = useState<number | null>(null)
 
   const gridSec = result ? result.columns * result.stepSec : 0
@@ -89,6 +90,7 @@ export function MapView({ imageUrl, imageAlt, result, time, playing, onSeek }: P
         })}
       >
         <img src={imageUrl} alt={imageAlt} />
+        {label && <span className="frame-label" aria-hidden="true">{label}</span>}
         {result && (
           <>
             <div className="ignored" style={{ height: `${result.cropBottom * 100}%` }} title="Legend area: not heard" />
