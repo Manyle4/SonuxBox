@@ -8,6 +8,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <cstdio>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -50,7 +51,11 @@ struct EarthResult {
     std::vector<NoteEvent> notes;
     std::vector<float> audio;   // mono samples, -1..1
     int sampleRate = 44100;
-    double durationSec = 0.0;
+    double durationSec = 0.0;   // full audio length, including the fade-out tail
+    double musicSec = 0.0;      // when the last note lets go (the playhead can stop here)
+    int imageWidth = 0;
+    int imageHeight = 0;
+    std::string analysisMode;   // "terrain" or "adaptive"
 };
 
 inline bool isActiveData(Terrain t, bool isDarkMap) {
@@ -269,12 +274,25 @@ inline std::vector<NoteEvent> buildNotes(const EarthAnalysis& analysis, const Ea
     return notes;
 }
 
-// Make a string safe to place inside JSON quotes (escape " and \).
+// Make a string safe to place inside JSON quotes.
 inline std::string jsonEscape(const std::string& s) {
     std::string out;
-    for (char c : s) {
-        if (c == '"' || c == '\\') out += '\\';
-        out += c;
+    for (const char c : s) {
+        switch (c) {
+            case '"':  out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default:
+                if (static_cast<unsigned char>(c) < 0x20) {
+                    char buf[8];
+                    std::snprintf(buf, sizeof buf, "\\u%04x", c);
+                    out += buf;
+                } else {
+                    out += c;
+                }
+        }
     }
     return out;
 }
@@ -292,15 +310,22 @@ inline std::string buildJson(const std::string& imageName, const std::string& au
     f << "  \"image\": \"" << jsonEscape(imageName) << "\",\n";
     f << "  \"audioUrl\": \"" << jsonEscape(audioUrl) << "\",\n";
     
-    const std::string modeText = r.mood.scaleName.empty()
-                                     ? std::string(r.mood.major ? "major" : "minor")
-                                     : r.mood.scaleName;
-    f << "  \"mode\": \"" << jsonEscape(modeText) << "\",\n";
+    f << "  \"analysisMode\": \"" << jsonEscape(r.analysisMode) << "\",\n";
+
+    const std::string scaleText = r.mood.scaleName.empty()
+                                      ? std::string(r.mood.major ? "major" : "minor")
+                                      : r.mood.scaleName;
+    f << "  \"scale\": \"" << jsonEscape(scaleText) << "\",\n";
 
     f << "  \"bpm\": " << r.mood.bpm << ",\n";
     f << "  \"rootMidi\": " << r.mood.rootMidi << ",\n";
+    // Image size + bottom crop let the page line column c up with the picture.
+    f << "  \"imageWidth\": " << r.imageWidth << ",\n";
+    f << "  \"imageHeight\": " << r.imageHeight << ",\n";
+    f << "  \"cropBottom\": " << kCropBottom << ",\n";
     f << "  \"columns\": " << kColumns << ",\n";
     f << "  \"stepSec\": " << stepSec << ",\n";
+    f << "  \"musicSec\": " << r.musicSec << ",\n";
     f << "  \"durationSec\": " << r.durationSec << ",\n";
 
     f << "  \"share\": {";
@@ -330,33 +355,4 @@ inline std::string buildJson(const std::string& imageName, const std::string& au
     f << "  ]\n";
     f << "}\n";
     return f.str();
-}
-
-// The whole pipeline in one call: image in, notes + audio out.
-// Returns true on success. On failure it returns false and puts a message in 'error'.
-// 'out' and 'error' are "output parameters": the '&' lets this function fill them in
-// for the caller, so one function can hand back a yes/no AND the details.
-inline bool generateEarthMusic(const cv::Mat& image, int sampleRate, EarthResult& out,
-                               std::string& error, bool verbose = false) {
-    if (image.empty()) {
-        error = "image is empty or could not be decoded";
-        return false;
-    }
-    if (image.cols < 16 || image.rows < 16) {
-        error = "image is too small (needs at least 16x16 pixels)";
-        return false;
-    }
-
-    out.analysis = analyzeEarth(image);
-    out.mood = decideMood(out.analysis.overall);
-    out.notes = buildNotes(out.analysis, out.mood, verbose);
-    if (out.notes.empty()) {
-        error = "no land found in the image";
-        return false;
-    }
-
-    out.sampleRate = sampleRate;
-    out.audio = renderNotes(out.notes, sampleRate);
-    out.durationSec = static_cast<double>(out.audio.size()) / sampleRate;
-    return true;
 }

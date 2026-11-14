@@ -1,32 +1,58 @@
 #include "httplib.h"
-#include "earth_pipeline.h"
+#include "music_engine.h"
 #include "wav_writer.h"
 
-#include <atomic>
-#include <chrono>
 #include <cstddef>
+#include <cstdint>
+#include <cstdlib>
 #include <exception>
 #include <filesystem>
 #include <iostream>
+#include <random>
 #include <string>
-#include <vector>
-
-#include <cstdlib>
 
 constexpr int kPort = 8080;
 constexpr int kSampleRate = 44100;
-constexpr std::size_t kMaxUploadBytes = 20 * 1024 * 1024;  // refuse uploads over 20 MB
+constexpr std::size_t kMaxUploadBytes = 20 * 1024 * 1024;  // 20 MB
 
-// Reply with an error as JSON, so the web team's code can read the message.
+std::string errorJson(const std::string& message) {
+    return "{\"error\": \"" + jsonEscape(message) + "\"}";
+}
+
 void sendError(httplib::Response& res, int status, const std::string& message) {
     res.status = status;
-    res.set_content("{\"error\": \"" + jsonEscape(message) + "\"}", "application/json");
+    res.set_content(errorJson(message), "application/json");
+}
+
+// 16 random hex chars, so nobody can guess other people's audio URLs.
+std::string randomId() {
+    thread_local std::random_device rd;
+    std::uint64_t v = (static_cast<std::uint64_t>(rd()) << 32) | rd();
+    static const char* hex = "0123456789abcdef";
+    std::string id;
+    for (int i = 0; i < 16; ++i) {
+        id += hex[v & 0xf];
+        v >>= 4;
+    }
+    return id;
+}
+
+// Empty means "use the default" (adaptive, since most uploads are data maps).
+bool parseMode(const std::string& text, AnalysisMode& mode) {
+    if (text.empty() || text == "adaptive") {
+        mode = AnalysisMode::Adaptive;
+        return true;
+    }
+    if (text == "terrain") {
+        mode = AnalysisMode::Terrain;
+        return true;
+    }
+    return false;
 }
 
 int main() {
-    // Generated WAV files go in ./output, which the server also serves under /audio.
-    const std::string outputDir = "output";
-    std::filesystem::create_directories(outputDir);  // does nothing if it already exists
+    const std::string outputDir = "output";  // WAVs go here, served under /audio
+    std::filesystem::create_directories(outputDir);
 
     int port = kPort;
     if (const char* envPort = std::getenv("PORT")) {
@@ -50,64 +76,87 @@ int main() {
         return 1;
     }
 
-    svr.Get("/api/health", [](const httplib::Request& /*req*/, httplib::Response& res) {
+    // Any error httplib produces itself (404, 413, ...) also comes back as {"error": "..."}.
+    svr.set_error_handler([](const httplib::Request&, httplib::Response& res) {
+        if (!res.body.empty()) return httplib::Server::HandlerResponse::Unhandled;  // already ours
+        const std::string message = (res.status == 413)
+                                        ? "image is too big (max 20 MB)"
+                                        : httplib::status_message(res.status);
+        res.set_content(errorJson(message), "application/json");
+        return httplib::Server::HandlerResponse::Handled;
+    });
+
+    svr.Get("/api/health", [](const httplib::Request&, httplib::Response& res) {
         res.set_content("{\"status\": \"ok\"}", "application/json");
     });
 
-    // Every result gets a unique id: start time + a counter that goes up by one per request.
-    // std::atomic makes the counter safe when several requests arrive at once (each on its own thread).
-    std::atomic<unsigned> counter{0};
-    const long long startTime = std::chrono::duration_cast<std::chrono::seconds>(
-                                    std::chrono::system_clock::now().time_since_epoch())
-                                    .count();
-
-    // [&] = this lambda may use the variables around it (counter, startTime, outputDir).
+    // Takes either FormData (file field "image") or the raw image bytes as the body.
+    // Mode: ?mode=adaptive|terrain, or a "mode" form field. Defaults to adaptive.
     svr.Post("/api/analyze", [&](const httplib::Request& req, httplib::Response& res) {
-        // 1. The request body must contain image bytes.
-        if (req.body.empty()) {
-            sendError(res, 400, "empty request body: send the image file's bytes as the POST body");
+        std::string modeText = req.get_param_value("mode");
+        std::string imageName = "upload";
+        std::string formBytes;
+        const std::string* bytes = &req.body;
+
+        if (req.is_multipart_form_data()) {
+            if (!req.form.has_file("image")) {
+                sendError(res, 400, "FormData needs a file field called \"image\"");
+                return;
+            }
+            const httplib::FormData file = req.form.get_file("image");
+            formBytes = file.content;
+            bytes = &formBytes;
+            if (!file.filename.empty()) imageName = file.filename;
+            if (modeText.empty() && req.form.has_field("mode")) {
+                modeText = req.form.get_field("mode");
+            }
+        }
+
+        AnalysisMode mode;
+        if (!parseMode(modeText, mode)) {
+            sendError(res, 400, "mode must be \"adaptive\" or \"terrain\"");
+            return;
+        }
+        if (bytes->empty()) {
+            sendError(res, 400, "no image: send FormData with an \"image\" file, or the raw image bytes");
             return;
         }
 
         try {
-            // 2. Turn the raw bytes into an OpenCV image (PNG, JPEG, etc. are detected automatically).
-            const std::vector<unsigned char> bytes(req.body.begin(), req.body.end());
-            const cv::Mat image = cv::imdecode(bytes, cv::IMREAD_COLOR);
+            // Wraps the bytes without copying them; imdecode spots PNG/JPEG/etc by itself.
+            const cv::Mat raw(1, static_cast<int>(bytes->size()), CV_8UC1,
+                              const_cast<char*>(bytes->data()));
+            const cv::Mat image = cv::imdecode(raw, cv::IMREAD_COLOR);
             if (image.empty()) {
-                sendError(res, 400, "could not decode the image: send a PNG or JPEG as the raw POST body");
+                sendError(res, 400, "could not decode the image (PNG or JPEG please)");
                 return;
             }
 
-            // 3. Run the pipeline you already built.
             EarthResult result;
             std::string error;
-            if (!generateEarthMusic(image, kSampleRate, result, error)) {
+            if (!generateMusic(image, kSampleRate, mode, result, error)) {
                 sendError(res, 422, error);
                 return;
             }
 
-            // 4. Save the audio and answer with the JSON.
-            const std::string id = "map_" + std::to_string(startTime) + "_" + std::to_string(counter++);
-            const std::string wavPath = outputDir + "/" + id + ".wav";
-            if (!writeWav16(wavPath, result.audio, result.sampleRate)) {
+            const std::string id = randomId();
+            if (!writeWav16(outputDir + "/" + id + ".wav", result.audio, result.sampleRate)) {
                 sendError(res, 500, "could not write the audio file");
                 return;
             }
 
-            res.set_content(buildJson("upload", "/audio/" + id + ".wav", result), "application/json");
-            std::cout << "analyze: " << req.body.size() << " bytes -> " << id << " ("
-                      << result.notes.size() << " notes, " << result.durationSec << " s)\n";
+            res.set_content(buildJson(imageName, "/audio/" + id + ".wav", result), "application/json");
+            std::cout << "analyze: " << bytes->size() << " bytes, " << modeName(mode) << " -> " << id
+                      << " (" << result.notes.size() << " notes, " << result.durationSec << " s)\n";
         } catch (const std::exception& e) {
-            // Any unexpected failure becomes a clean 500 reply instead of crashing the server.
-            sendError(res, 500, e.what());
+            sendError(res, 500, e.what());  // don't let one bad image take the server down
         }
     });
 
     std::cout << "Server running on port " << port << ".\n"
               << "  GET  http://localhost:" << port << "/api/health\n"
-              << "  POST http://localhost:" << port << "/api/analyze   (body = image bytes)\n"
-              << "  GET  http://localhost:" << port << "/audio/<id>.wav\n"
-              << "Press Ctrl+C to stop.\n";
+              << "  POST http://localhost:" << port << "/api/analyze?mode=adaptive|terrain\n"
+              << "  GET  http://localhost:" << port << "/audio/<id>.wav\n";
 
     if (!svr.listen("0.0.0.0", port)) {
         std::cerr << "Could not start the server. Is port " << port << " already in use?\n";

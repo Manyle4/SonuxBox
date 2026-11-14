@@ -4,6 +4,7 @@
 #include "adaptive.h"
 #include "composer.h"
 
+#include <algorithm>
 #include <iostream>
 #include <string>
 
@@ -59,5 +60,12 @@ inline bool generateMusic(const cv::Mat& image, int sampleRate, AnalysisMode mod
     out.sampleRate = sampleRate;
     out.audio = renderNotes(out.notes, sampleRate);
     out.durationSec = static_cast<double>(out.audio.size()) / sampleRate;
+    out.musicSec = 0.0;
+    for (const NoteEvent& n : out.notes) {
+        out.musicSec = std::max(out.musicSec, n.startSec + n.durationSec);
+    }
+    out.imageWidth = image.cols;
+    out.imageHeight = image.rows;
+    out.analysisMode = modeName(mode);
     return true;
 }

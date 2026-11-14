@@ -8,6 +8,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(OpenCV REQUIRED)
 find_package(Threads REQUIRED)
 
+# The engine only needs these; linking all of OpenCV makes startup crawl.
+set(ENGINE_CV_LIBS opencv_core opencv_imgproc opencv_imgcodecs)
+
 add_executable(img2sound src/main.cpp)
 target_include_directories(img2sound PRIVATE ${OpenCV_INCLUDE_DIRS})
 target_link_libraries(img2sound PRIVATE ${OpenCV_LIBS})
@@ -32,11 +35,11 @@ target_link_libraries(color_debug PRIVATE ${OpenCV_LIBS})
 
 add_executable(earth_story src/earth_story.cpp)
 target_include_directories(earth_story PRIVATE ${OpenCV_INCLUDE_DIRS})
-target_link_libraries(earth_story PRIVATE ${OpenCV_LIBS})
+target_link_libraries(earth_story PRIVATE ${ENGINE_CV_LIBS})
 
 add_executable(api_server src/api_server.cpp)
 target_include_directories(api_server PRIVATE third_party/httplib ${OpenCV_INCLUDE_DIRS})
-target_link_libraries(api_server PRIVATE Threads::Threads ${OpenCV_LIBS})
+target_link_libraries(api_server PRIVATE Threads::Threads ${ENGINE_CV_LIBS})
 
 add_executable(cluster_debug src/cluster_debug.cpp)
 target_include_directories(cluster_debug PRIVATE ${OpenCV_INCLUDE_DIRS})
