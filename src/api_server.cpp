@@ -70,11 +70,20 @@ int main() {
         }
 
         try {
-            // 2. Turn the raw bytes into an OpenCV image (PNG, JPEG, etc. are detected automatically).
-            const std::vector<unsigned char> bytes(req.body.begin(), req.body.end());
+            std::vector<unsigned char> bytes;
+            if (req.is_multipart_form_data() && req.form.has_file("image")) {
+                const auto& file = req.form.get_file("image");
+                bytes.assign(file.content.begin(), file.content.end());
+            } else if (!req.body.empty()) {
+                bytes.assign(req.body.begin(), req.body.end());
+            } else {
+                sendError(res, 400, "empty request: send raw image bytes or FormData field 'image'");
+                return;
+            }
+
             const cv::Mat image = cv::imdecode(bytes, cv::IMREAD_COLOR);
             if (image.empty()) {
-                sendError(res, 400, "could not decode the image: send a PNG or JPEG as the raw POST body");
+                sendError(res, 400, "could not decode the image: send a valid PNG or JPEG");
                 return;
             }
 
