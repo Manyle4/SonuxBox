@@ -17,14 +17,14 @@ struct SignalMap {
 };
 
 // Learn the image's palette with K-means and measure every pixel against the background.
-inline SignalMap computeSignalMap(const cv::Mat& image, int k = 4) {
+inline SignalMap computeSignalMap(const cv::Mat& image, int k = 4, double cropBottom = kCropBottom) {
     SignalMap out;
 
     // 256-pixel-wide copy, legend strip cut off, lightly blurred to calm noise and thin text.
     const double scale = 256.0 / image.cols;
     cv::Mat mid;
     cv::resize(image, mid, cv::Size(), scale, scale, cv::INTER_AREA);
-    const int keepRows = static_cast<int>(mid.rows * (1.0 - kCropBottom));
+    const int keepRows = static_cast<int>(mid.rows * (1.0 - cropBottom));
     cv::Mat map = mid(cv::Rect(0, 0, mid.cols, keepRows)).clone();
     cv::GaussianBlur(map, map, cv::Size(3, 3), 0);
     out.preview = map;

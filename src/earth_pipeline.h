@@ -21,7 +21,8 @@ constexpr int kBarColumns = 4;           // columns per bar (one bass note each)
 constexpr int kScaleDegrees = 10;        // melody range: 10 pentatonic notes = 2 octaves
 constexpr int kMaxLeap = 3;              // biggest jump between neighbouring melody notes
 constexpr int kRootMidi = 57;            // A3: the home note of the piece
-constexpr double kCropBottom = 0.12;     // ignore the bottom 12% (legend + timestamp)
+constexpr double kCropBottom = 0.12;     // default: ignore the bottom 12% (legend + timestamp)
+constexpr double kMaxCrop = 0.3;         // never throw away more than this
 
 // What we learned about one column of the map.
 struct ColumnStats {
@@ -55,6 +56,7 @@ struct EarthResult {
     double musicSec = 0.0;      // when the last note lets go (the playhead can stop here)
     int imageWidth = 0;
     int imageHeight = 0;
+    double cropBottom = kCropBottom;  // share of the bottom that was ignored
     std::string analysisMode;   // "terrain" or "adaptive"
 };
 
@@ -65,12 +67,12 @@ inline bool isActiveData(Terrain t, bool isDarkMap) {
     return false;
 }
 
-inline EarthAnalysis analyzeEarth(const cv::Mat& image) {
+inline EarthAnalysis analyzeEarth(const cv::Mat& image, double cropBottom = kCropBottom) {
     // 256-pixel-wide copy, with the legend strip cut off the bottom.
     const double scale = 256.0 / image.cols;
     cv::Mat mid;
     cv::resize(image, mid, cv::Size(), scale, scale, cv::INTER_AREA);
-    const int keepRows = static_cast<int>(mid.rows * (1.0 - kCropBottom));
+    const int keepRows = static_cast<int>(mid.rows * (1.0 - cropBottom));
     const cv::Mat map = mid(cv::Rect(0, 0, mid.cols, keepRows));
 
     cv::Mat hsv;
@@ -160,6 +162,37 @@ inline EarthMood decideMood(const std::array<double, kTerrainCount>& overall) {
     return mood;
 }
 
+inline const char* voiceName(int voice) {
+    switch (voice) {
+        case 1: return "bass";
+        case 2: return "pad";
+        case 3: return "perc";
+        default: return "melody";
+    }
+}
+
+// Percussion: a hit wherever the signal jumps up from one column to the next,
+// so sudden features (lightning, city clusters, plume edges) land on the beat.
+inline void addPercussion(std::vector<NoteEvent>& notes, const std::vector<ColumnStats>& cols,
+                          double stepSec) {
+    double maxSignal = 0.0;
+    for (const ColumnStats& c : cols) maxSignal = std::max(maxSignal, c.landFraction);
+    if (maxSignal <= 0.0) return;
+
+    constexpr double kJump = 0.25;  // rise of at least 25% of the strongest column
+    for (std::size_t x = 1; x < cols.size(); ++x) {
+        const double rise = (cols[x].landFraction - cols[x - 1].landFraction) / maxSignal;
+        if (rise < kJump) continue;
+        NoteEvent hit;
+        hit.startSec = x * stepSec;
+        hit.durationSec = 0.12;
+        hit.midiNote = 0;  // unpitched
+        hit.velocity = static_cast<float>(std::min(0.4 + rise, 1.0));
+        hit.voice = 3;
+        notes.push_back(hit);
+    }
+}
+
 // 'verbose' = print the per-column table and melody to the terminal (handy for the
 // command-line tool, noisy for a server).
 inline std::vector<NoteEvent> buildNotes(const EarthAnalysis& analysis, const EarthMood& mood,
@@ -246,6 +279,8 @@ inline std::vector<NoteEvent> buildNotes(const EarthAnalysis& analysis, const Ea
         notes.push_back(bass);
     }
 
+    addPercussion(notes, cols, stepSec);
+
     /// ---- Harmony Pad: warm open acoustic voicing per bar ----
     for (int bar = 0; bar < kColumns / kBarColumns; ++bar) {
         double ocean = 0.0;
@@ -302,7 +337,8 @@ inline std::string jsonEscape(const std::string& s) {
 inline std::string buildJson(const std::string& imageName, const std::string& audioUrl,
                              const EarthResult& r) {
     std::ostringstream f;
-    f << std::fixed << std::setprecision(3);  // print decimals with 3 digits
+    // 6 decimals: times get multiplied up on the page, so 3 drifted by a few ms.
+    f << std::fixed << std::setprecision(6);
 
     const double stepSec = 60.0 / r.mood.bpm / 2.0;
 
@@ -322,7 +358,7 @@ inline std::string buildJson(const std::string& imageName, const std::string& au
     // Image size + bottom crop let the page line column c up with the picture.
     f << "  \"imageWidth\": " << r.imageWidth << ",\n";
     f << "  \"imageHeight\": " << r.imageHeight << ",\n";
-    f << "  \"cropBottom\": " << kCropBottom << ",\n";
+    f << "  \"cropBottom\": " << r.cropBottom << ",\n";
     f << "  \"columns\": " << kColumns << ",\n";
     f << "  \"stepSec\": " << stepSec << ",\n";
     f << "  \"musicSec\": " << r.musicSec << ",\n";
@@ -349,7 +385,7 @@ inline std::string buildJson(const std::string& imageName, const std::string& au
         const NoteEvent& n = r.notes[i];
         f << "    {\"start\": " << n.startSec << ", \"dur\": " << n.durationSec
           << ", \"midi\": " << n.midiNote << ", \"vel\": " << n.velocity
-          << ", \"voice\": \"" << (n.voice == 1 ? "bass" : (n.voice == 2 ? "pad" : "melody")) << "\"}"
+          << ", \"voice\": \"" << voiceName(n.voice) << "\"}"
           << (i + 1 < r.notes.size() ? "," : "") << "\n";
     }
     f << "  ]\n";

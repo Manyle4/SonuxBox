@@ -9,7 +9,7 @@ struct NoteEvent {
     double durationSec;  // how long it is held
     int midiNote;        // pitch as a MIDI number (60 = middle C, 69 = A440)
     float velocity;      // loudness from 0.0 to 1.0
-    int voice = 0;       // which part plays it: 0 = melody, 1 = bass
+    int voice = 0;       // 0 = melody, 1 = bass, 2 = pad, 3 = percussion
 };
 
 // Convert a MIDI note number to a frequency in Hz.

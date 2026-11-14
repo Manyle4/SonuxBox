@@ -6,6 +6,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 
 constexpr double kTwoPi = 6.283185307179586;
@@ -30,8 +31,10 @@ inline const Instrument& instrumentFor(int voice) {
     static const Instrument melody = {0.015, 0.10, 0.75, 0.30, {1.0, 0.30, 0.12, 0.0, 0.0, 0.0},  1, 0.0, 0.004, 0.30};
     static const Instrument bass   = {0.040, 0.10, 0.85, 0.50, {1.0, 0.50, 0.25, 0.10, 0.0, 0.0}, 1, 0.0, 0.0,   0.32};
     static const Instrument pad    = {0.700, 0.30, 0.85, 1.40, {1.0, 0.50, 0.33, 0.25, 0.0, 0.0}, 3, 7.0, 0.0,   0.09};
+    static const Instrument perc   = {0.001, 0.0,  1.0,  0.0,  {0.0, 0.0, 0.0, 0.0, 0.0, 0.0},  1, 0.0, 0.0,   0.22};
     if (voice == 1) return bass;
     if (voice == 2) return pad;
+    if (voice == 3) return perc;
     return melody;
 }
 
@@ -50,6 +53,22 @@ inline double adsr(double t, double noteDur, const Instrument& in) {
     return levelAtRelease * (1.0 - r / in.release);
 }
 
+// A drum-like hit: noise that dies away fast, plus a short low sine "thump".
+// The noise uses a fixed seed so the same image always sounds the same.
+inline void renderHit(std::vector<float>& out, const NoteEvent& n, const Instrument& in, int sampleRate) {
+    const std::size_t first = static_cast<std::size_t>(n.startSec * sampleRate);
+    const std::size_t count = static_cast<std::size_t>(n.durationSec * sampleRate);
+    std::uint32_t seed = 12345u + static_cast<std::uint32_t>(first);
+    for (std::size_t i = 0; i < count && first + i < out.size(); ++i) {
+        const double t = static_cast<double>(i) / sampleRate;
+        seed = seed * 1664525u + 1013904223u;  // cheap random numbers
+        const double noise = (seed >> 8) / 8388608.0 - 1.0;  // -1..1
+        const double thump = std::sin(kTwoPi * (55.0 + 60.0 * std::exp(-t * 40.0)) * t);
+        const double sample = 0.35 * noise * std::exp(-t * 60.0) + thump * std::exp(-t * 18.0);
+        out[first + i] += static_cast<float>(sample * in.gain * n.velocity);
+    }
+}
+
 // Turn a list of notes into audio samples (floats between -1 and 1), mono.
 inline std::vector<float> renderNotes(const std::vector<NoteEvent>& notes, int sampleRate) {
     // 1. Work out how long the whole piece is (each instrument has its own release time).
@@ -63,6 +82,10 @@ inline std::vector<float> renderNotes(const std::vector<NoteEvent>& notes, int s
 
     for (const NoteEvent& n : notes) {
         const Instrument& in = instrumentFor(n.voice);
+        if (n.voice == 3) {  // percussion: a soft noise click over a low thump
+            renderHit(out, n, in, sampleRate);
+            continue;
+        }
         const double baseFreq = midiToFreq(n.midiNote);
         const std::size_t first = static_cast<std::size_t>(n.startSec * sampleRate);
         const std::size_t count = static_cast<std::size_t>((n.durationSec + in.release) * sampleRate);

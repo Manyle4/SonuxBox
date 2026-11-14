@@ -21,9 +21,14 @@ inline const char* modeName(AnalysisMode m) {
 // The whole pipeline, with a choice of analysis mode.
 // Returns true on success; on failure returns false with a message in 'error'.
 inline bool generateMusic(const cv::Mat& image, int sampleRate, AnalysisMode mode,
-                          EarthResult& out, std::string& error, bool verbose = false) {
+                          EarthResult& out, std::string& error, bool verbose = false,
+                          double cropBottom = kCropBottom) {
     if (image.empty()) {
         error = "image is empty or could not be decoded";
+        return false;
+    }
+    if (cropBottom < 0.0 || cropBottom > kMaxCrop) {
+        error = "crop must be between 0 and 0.3";
         return false;
     }
     if (image.cols < 16 || image.rows < 16) {
@@ -32,7 +37,7 @@ inline bool generateMusic(const cv::Mat& image, int sampleRate, AnalysisMode mod
     }
 
     if (mode == AnalysisMode::Adaptive) {
-        const SignalMap sig = computeSignalMap(image);
+        const SignalMap sig = computeSignalMap(image, 4, cropBottom);
         out.analysis = analyzeAdaptive(sig);
         const ImageTraits traits = measureTraits(sig, out.analysis);
         const MusicProfile profile = chooseProfile(traits);
@@ -45,7 +50,7 @@ inline bool generateMusic(const cv::Mat& image, int sampleRate, AnalysisMode mod
         }
         out.notes = composeNotes(out.analysis, profile, verbose);
     } else {
-        out.analysis = analyzeEarth(image);
+        out.analysis = analyzeEarth(image, cropBottom);
         out.mood = decideMood(out.analysis.overall);
         out.mood.scaleName = out.mood.major ? "major pentatonic" : "minor pentatonic";
         out.notes = buildNotes(out.analysis, out.mood, verbose);
@@ -67,5 +72,6 @@ inline bool generateMusic(const cv::Mat& image, int sampleRate, AnalysisMode mod
     out.imageWidth = image.cols;
     out.imageHeight = image.rows;
     out.analysisMode = modeName(mode);
+    out.cropBottom = cropBottom;
     return true;
 }
