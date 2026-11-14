@@ -1,3 +1,6 @@
+// httplib caps form-urlencoded bodies at 8 KB, and curl sends raw bytes with that
+// type by default. Give them the same 20 MB limit as everything else.
+#define CPPHTTPLIB_FORM_URL_ENCODED_PAYLOAD_MAX_LENGTH (20 * 1024 * 1024)
 #include "httplib.h"
 #include "music_engine.h"
 #include "wav_writer.h"
