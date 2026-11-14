@@ -5,7 +5,7 @@
 Built by **team SonuX** (Accra, Ghana) for the **NASA Space Apps Challenge 2026**, challenge
 [*The Earth Information Jukebox*](https://www.spaceappschallenge.org/2026/challenges/the-earth-information-jukebox/).
 
-- **Live site:** _coming soon_
+- **Live site:** https://sonuxbox.vercel.app
 - **API:** https://sonuxbox-api-285f8ea04b1d.herokuapp.com/api/health
 
 ## Why sound?
