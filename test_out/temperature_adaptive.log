@@ -1,7 +1,0 @@
-traits: signal 0.447201, background brightness 0.513725, signal hue 288.761 deg (colourfulness 0.630909), activity 0.176451
-melody (scale degree per column, . = rest, - = held):
-8 - - 9 8 5 4 3 4 7 10 8 6 7 8 7 5 - - 4 3 - - 2 - 3 5 8 9 8 - - 
-analysis mode: adaptive
-=> A# minor, 99.5416 BPM
-Generated 31 notes.
-Wrote test_out/temperature_adaptive.wav and test_out/temperature_adaptive.json

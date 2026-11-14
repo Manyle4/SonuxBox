@@ -238,6 +238,8 @@ inline std::vector<NoteEvent> composeNotes(const EarthAnalysis& analysis, const 
             notes.push_back(pad);
         }
     }
+
+    addPercussion(notes, cols, stepSec);
     
     return notes;
 }

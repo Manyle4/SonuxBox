@@ -1,1 +1,0 @@
-/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/melody_test.dir/link.d CMakeFiles/melody_test.dir/src/melody_test.cpp.o -o melody_test

@@ -1,7 +1,0 @@
-traits: signal 0.184141, background brightness 0.0784314, signal hue 69.6726 deg (colourfulness 0.410913), activity 0.294205
-melody (scale degree per column, . = rest, - = held):
-6 3 2 4 6 7 10 12 - 9 8 9 12 11 8 5 6 7 6 7 - - 8 10 11 9 6 5 6 7 . . 
-analysis mode: adaptive
-=> D mixolydian, 79.3989 BPM
-Generated 35 notes.
-Wrote test_out/image_adaptive.wav and test_out/image_adaptive.json

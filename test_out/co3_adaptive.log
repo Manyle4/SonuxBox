@@ -1,7 +1,0 @@
-traits: signal 0.285411, background brightness 0.756863, signal hue 253.888 deg (colourfulness 0.255334), activity 0.2462
-melody (scale degree per column, . = rest, - = held):
-6 4 3 5 7 8 9 - 7 4 2 3 5 7 9 12 11 8 6 9 10 8 - 9 11 12 11 8 5 4 - 5 
-analysis mode: adaptive
-=> G# dorian, 87.073 BPM
-Generated 37 notes.
-Wrote test_out/co3_adaptive.wav and test_out/co3_adaptive.json

@@ -1,0 +1,10 @@
+build
+output
+test_out
+imdebug
+images
+*.wav
+*.json
+*.png
+.git
+frontend

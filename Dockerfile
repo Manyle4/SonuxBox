@@ -1,16 +1,17 @@
 FROM ubuntu:24.04
 
-# Install C++ compiler and OpenCV
-RUN apt-get update && apt-get install -y \
-    g++ \
-    libopencv-dev \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    g++ cmake make libopencv-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY . .
+COPY CMakeLists.txt .
+COPY src src
+COPY third_party third_party
 
-# Compile the server with optimizations and threading support
-RUN g++ -O3 -std=c++17 api_server.cpp -o api_server $(pkg-config --cflags --libs opencv4) -lpthread
+# Only the server is needed here, not the debug tools.
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSONUX_TOOLS=OFF \
+    && cmake --build build --target api_server -j"$(nproc)"
 
 EXPOSE 8080
-CMD ["./api_server"]
+CMD ["./build/api_server"]
