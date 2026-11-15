@@ -8,6 +8,12 @@
     "source": {
       "label": "NASA GMAO / SVS: Air Quality Model Runs",
       "url": "https://svs.gsfc.nasa.gov/5533/"
+    },
+    "geo": {
+      "west": -180,
+      "east": 180,
+      "north": 90,
+      "south": -90
     }
   },
   {
@@ -19,6 +25,12 @@
     "source": {
       "label": "NASA GMAO / SVS: Air Quality Model Runs",
       "url": "https://svs.gsfc.nasa.gov/5533/"
+    },
+    "geo": {
+      "west": -180,
+      "east": 180,
+      "north": 90,
+      "south": -90
     }
   },
   {
@@ -30,6 +42,12 @@
     "source": {
       "label": "NASA GMAO / SVS: Air Quality Model Runs",
       "url": "https://svs.gsfc.nasa.gov/5533/"
+    },
+    "geo": {
+      "west": -180,
+      "east": 180,
+      "north": 90,
+      "south": -90
     }
   },
   {
@@ -41,6 +59,12 @@
     "source": {
       "label": "NASA SVS: GEOS Aerosols",
       "url": "https://svs.gsfc.nasa.gov/5669/"
+    },
+    "geo": {
+      "west": -180,
+      "east": 180,
+      "north": 90,
+      "south": -90
     }
   },
   {
@@ -52,6 +76,12 @@
     "source": {
       "label": "NASA SVS: Global Sea Surface Currents and Temperature",
       "url": "https://svs.gsfc.nasa.gov/3912/"
+    },
+    "geo": {
+      "west": -180,
+      "east": 180,
+      "north": 90,
+      "south": -90
     }
   },
   {
@@ -121,6 +151,12 @@
     "source": {
       "label": "NASA SVS: Lightning Events Detected from the ISS",
       "url": "https://svs.gsfc.nasa.gov/5011/"
+    },
+    "geo": {
+      "west": -180,
+      "east": 180,
+      "north": 90,
+      "south": -90
     }
   },
   {

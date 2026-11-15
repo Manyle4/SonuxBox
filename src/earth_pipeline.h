@@ -29,7 +29,24 @@ struct ColumnStats {
     std::array<double, kTerrainCount> fraction{};  // share of each terrain type, 0..1
     double landFraction = 0.0;                     // vegetation + land + ice together
     double landPos = 0.5;                          // vertical centre of the land: 0 = bottom, 1 = top
+    double peakPos = 0.5;                          // height of the strongest band (for naming places)
 };
+
+// Height (0 bottom .. 1 top) of the strongest band in a column's per-row totals.
+// Smoothed over a few rows so one noisy pixel row can't win. Falls back if empty.
+inline double peakHeight(const std::vector<double>& rows, double fallback) {
+    const int n = static_cast<int>(rows.size());
+    if (n < 2) return fallback;
+    constexpr int kHalf = 4;
+    double best = 0.0;
+    int bestY = -1;
+    for (int y = 0; y < n; ++y) {
+        double s = 0.0;
+        for (int k = std::max(0, y - kHalf); k <= std::min(n - 1, y + kHalf); ++k) s += rows[k];
+        if (s > best) { best = s; bestY = y; }
+    }
+    return bestY < 0 ? fallback : 1.0 - static_cast<double>(bestY) / (n - 1);
+}
 
 // What we learned about the whole map.
 struct EarthAnalysis {
@@ -85,6 +102,9 @@ inline EarthAnalysis analyzeEarth(const cv::Mat& image, double cropBottom = kCro
 
     // Store row sums for each terrain type per column so we can compute landPos afterward
     std::vector<std::array<double, kTerrainCount>> colRowSums(kColumns);
+    // Per-row counts too, to find each column's strongest band.
+    std::vector<std::vector<std::array<float, kTerrainCount>>> rowCounts(
+        kColumns, std::vector<std::array<float, kTerrainCount>>(hsv.rows));
 
     for (int c = 0; c < kColumns; ++c) {
         const int x0 = c * hsv.cols / kColumns;
@@ -100,6 +120,7 @@ inline EarthAnalysis analyzeEarth(const cv::Mat& image, double cropBottom = kCro
                 counts[i] += 1.0;
                 overallCounts[i] += 1.0;
                 colRowSums[c][i] += y;
+                rowCounts[c][y][i] += 1.0f;
                 total += 1.0;
             }
         }
@@ -139,6 +160,14 @@ inline EarthAnalysis analyzeEarth(const cv::Mat& image, double cropBottom = kCro
         if (activePixels > 0.0 && hsv.rows > 1) {
             col.landPos = 1.0 - (activeRowSum / activePixels) / (hsv.rows - 1);
         }
+
+        std::vector<double> active(hsv.rows, 0.0);
+        for (int y = 0; y < hsv.rows; ++y) {
+            for (int i = 0; i < kTerrainCount; ++i) {
+                if (isActiveData(static_cast<Terrain>(i), isDarkMap)) active[y] += rowCounts[c][y][i];
+            }
+        }
+        col.peakPos = peakHeight(active, col.landPos);
     }
 
     return result;
@@ -376,7 +405,7 @@ inline std::string buildJson(const std::string& imageName, const std::string& au
         const ColumnStats& col = r.analysis.columns[c];
         f << "    {\"land\": " << col.landFraction
           << ", \"ocean\": " << col.fraction[static_cast<int>(Terrain::Ocean)]
-          << ", \"landPos\": " << col.landPos << "}" << (c + 1 < kColumns ? "," : "") << "\n";
+          << ", \"landPos\": " << col.landPos << ", \"peakPos\": " << col.peakPos << "}" << (c + 1 < kColumns ? "," : "") << "\n";
     }
     f << "  ],\n";
 

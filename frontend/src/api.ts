@@ -22,6 +22,7 @@ export interface ColumnStat {
   land: number // signal strength in adaptive mode
   ocean: number // quiet share in adaptive mode
   landPos: number // 0 = bottom, 1 = top
+  peakPos?: number // height of the strongest band (newer engine only)
 }
 
 export interface AnalyzeResult {

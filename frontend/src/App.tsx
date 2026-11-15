@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { analyze, API_URL, atSpeed, MAX_UPLOAD_BYTES, type AnalysisMode, type AnalyzeResult, type Voice } from './api'
 import { useAudioEngine } from './audio/useAudioEngine'
 import { Dropzone } from './components/Dropzone'
+import { Caption } from './components/Caption'
 import { CopyLink, ReadAloud } from './components/Extras'
 import { Gallery } from './components/Gallery'
 import { MapView } from './components/MapView'
@@ -186,11 +187,13 @@ export default function App() {
   const segTime = seg && time > 0 ? Math.max(time - seg.start, 0.0001) : 0
   const shownFrame = source?.frames[segIndex] ?? source?.frames[0]
 
-  const description = !joined
+  // Described at normal speed, so the pre-made narration always matches.
+  const geo = track?.geo
+  const description = !results || !source
     ? ''
     : series
-      ? describeSeries(joined.segments, title)
-      : describePiece(joined.segments[0].result, title)
+      ? describeSeries(results.map((r, i) => ({ result: r, label: source.frames[i].label })), title)
+      : describePiece(results[0], title, geo)
 
   const toggleLayer = (v: Voice) =>
     setMuted((old) => {
@@ -280,6 +283,7 @@ export default function App() {
                 time={segTime}
                 playing={playing}
                 onSeek={(t) => seek((seg?.start ?? 0) + t)}
+                geo={geo}
               />
 
               {ready && piece && seg && (
@@ -288,6 +292,7 @@ export default function App() {
                     onToggle={toggle} onDownload={download} />
                   <Mixer muted={muted} onToggle={toggleLayer} rate={rate} onRate={setRate}
                     hasPerc={piece.notes.some((n) => n.voice === 'perc')} />
+                  <Caption result={seg.result} time={segTime} playing={playing} geo={geo} />
                   <PianoRoll result={piece} time={time} onSeek={seek} muted={muted}
                     marks={series ? joined.segments.map((s) => ({ at: s.start, label: s.label })) : []} />
 

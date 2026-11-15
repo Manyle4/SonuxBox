@@ -1,4 +1,5 @@
 import type { AnalyzeResult, Note } from './api'
+import { placeOf, type Geo } from './geo'
 
 const NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
 
@@ -42,17 +43,24 @@ export function columnInfo(r: AnalyzeResult, col: number): ColumnInfo {
   return { strength, rest: !melody, melody, bass: at('bass') }
 }
 
-// Short line for the explore slider, read out by screen readers.
-export function describeColumn(r: AnalyzeResult, col: number) {
+// Region name for a slice, or null when the image isn't a known world map.
+export const placeAt = (r: AnalyzeResult, col: number, geo?: Geo) =>
+  geo ? placeOf(geo, col, r.columns, r.columnStats[col].peakPos ?? r.columnStats[col].landPos, r.cropBottom) : null
+
+// Short line for the explore slider and live captions, read out by screen readers.
+export function describeColumn(r: AnalyzeResult, col: number, geo?: Geo) {
   const info = columnInfo(r, col)
   const word = info.rest ? 'little' : info.strength >= 0.7 ? 'strong' : 'some'
-  const base = `Column ${col + 1} of ${r.columns}: ${word} signal`
+  const place = placeAt(r, col, geo)
+  const base = `${place ? `${cap(place)}, slice` : 'Slice'} ${col + 1} of ${r.columns}: ${word} signal`
   if (!info.melody) return `${base}, rest`
   return `${base}, ${height(r.columnStats[col].landPos)}, note ${noteName(info.melody.midi)}`
 }
 
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1)
+
 // A few sentences describing the whole piece, built from the same numbers that made the music.
-export function describePiece(r: AnalyzeResult, title: string) {
+export function describePiece(r: AnalyzeResult, title: string, geo?: Geo) {
   const cols = r.columnStats
   const infos = cols.map((_, i) => columnInfo(r, i))
   const restCount = infos.filter((c) => c.rest).length
@@ -75,16 +83,23 @@ export function describePiece(r: AnalyzeResult, title: string) {
   const highest = melody.reduce<Note | null>((top, n) => (!top || n.midi > top.midi ? n : top), null)
   const highCol = highest ? Math.min(Math.floor(highest.start / r.stepSec), r.columns - 1) : peak
 
+  // With a world map, say where; otherwise say where across the image.
+  const where = (col: number) => {
+    const p = placeAt(r, col, geo)
+    return p ? `over ${p}` : `at ${across(col, r.columns)}`
+  }
   const sentences = [
     `${title}, played as a ${secs(r.musicSec)} piece in ${r.scale} at ${Math.round(r.bpm)} beats per minute.`,
     'The image is read from left to right, one slice per beat.',
     best.to >= best.from
-      ? `The melody is busiest from ${across(best.from, r.columns)} to ${across(best.to, r.columns)} of the image ` +
+      ? (geo
+          ? `The melody is busiest from ${placeAt(r, best.from, geo)} to ${placeAt(r, best.to, geo)} `
+          : `The melody is busiest from ${across(best.from, r.columns)} to ${across(best.to, r.columns)} of the image `) +
         `(about ${secs(best.from * r.stepSec)} to ${secs((best.to + 1) * r.stepSec)} in).`
       : 'The image has very little signal, so the melody is sparse.',
-    `The strongest signal is at ${across(peak, r.columns)}, around ${secs(peak * r.stepSec)} in, where the melody is loudest.`,
+    `The strongest signal is ${where(peak)}, around ${secs(peak * r.stepSec)} in, where the melody is loudest.`,
     highest
-      ? `Its highest note, ${noteName(highest.midi)}, comes at ${across(highCol, r.columns)}, where the signal sits ${height(cols[highCol].landPos)} of the image.`
+      ? `Its highest note, ${noteName(highest.midi)}, comes ${where(highCol)}, where the signal sits ${height(cols[highCol].landPos)} of the image.`
       : '',
     restCount > 0
       ? `About ${Math.round((restCount / r.columns) * 100)}% of the slices are quiet enough that the melody rests.`

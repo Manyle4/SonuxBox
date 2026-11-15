@@ -103,10 +103,12 @@ inline EarthAnalysis analyzeAdaptive(const SignalMap& sig) {
         const int x1 = (c + 1) * I.cols / kColumns;
 
         double sum = 0.0, rowWeighted = 0.0, total = 0.0, quiet = 0.0;
+        std::vector<double> rowSignal(I.rows, 0.0);
         for (int y = 0; y < I.rows; ++y) {
             for (int x = x0; x < x1; ++x) {
                 const double v = I.at<float>(y, x);
                 sum += v;
+                rowSignal[y] += v;
                 rowWeighted += v * y;
                 total += 1.0;
                 if (v < 0.15) quiet += 1.0;
@@ -120,6 +122,7 @@ inline EarthAnalysis analyzeAdaptive(const SignalMap& sig) {
             // Signal-weighted vertical centre; flip so the top of the map = high pitch.
             col.landPos = 1.0 - (rowWeighted / sum) / (I.rows - 1);
         }
+        col.peakPos = peakHeight(rowSignal, col.landPos);
     }
     return result;
 }

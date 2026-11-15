@@ -193,3 +193,9 @@ footer a { color: var(--muted); }
 .framemark { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; }
 .roll { position: relative; }
 .framelabel { position: absolute; top: 4px; margin-left: 6px; font-size: 0.75rem; color: var(--accent); pointer-events: none; }
+
+/* ---- live caption ---- */
+.caption { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); }
+.caption p { margin: 0; font-variant-numeric: tabular-nums; }
+.caption .now { display: inline-block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-ink); background: var(--accent); border-radius: 4px; padding: 1px 6px; margin-right: 6px; }
+.caption label { font-size: 0.8rem; color: var(--muted); display: flex; align-items: center; gap: 6px; cursor: pointer; }

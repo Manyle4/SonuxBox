@@ -1,4 +1,5 @@
 import type { AnalysisMode, AnalyzeResult } from './api'
+import type { Geo } from './geo'
 import list from './tracks.json'
 
 export interface Track {
@@ -10,6 +11,7 @@ export interface Track {
   crop?: number // share of the bottom to ignore; 0 for images with no legend strip
   source: { label: string; url: string }
   frames?: { id: string; label: string }[] // a time-lapse: images played one after another
+  geo?: Geo // set for flat world maps, so descriptions can name places
 }
 
 // Frames from NASA's Earth Information Center visuals, made by the Scientific
