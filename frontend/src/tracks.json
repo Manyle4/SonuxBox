@@ -15,7 +15,11 @@
       "north": 90,
       "south": -90
     },
-    "cropTop": 0.08
+    "cropTop": 0.08,
+    "data": {
+      "from": "GEOS-CF air quality model (NASA GMAO)",
+      "when": "15 August 2023, as stamped on the frame"
+    }
   },
   {
     "id": "o3",
@@ -33,7 +37,11 @@
       "north": 90,
       "south": -90
     },
-    "cropTop": 0.08
+    "cropTop": 0.08,
+    "data": {
+      "from": "GEOS-CF air quality model (NASA GMAO)",
+      "when": "15 August 2023, as stamped on the frame"
+    }
   },
   {
     "id": "nox",
@@ -51,7 +59,11 @@
       "north": 90,
       "south": -90
     },
-    "cropTop": 0.08
+    "cropTop": 0.08,
+    "data": {
+      "from": "GEOS-CF air quality model (NASA GMAO)",
+      "when": "15 August 2023, as stamped on the frame"
+    }
   },
   {
     "id": "aerosol",
@@ -86,7 +98,11 @@
         "hex": "#53dc34",
         "name": "sulfate"
       }
-    ]
+    ],
+    "data": {
+      "from": "GEOS model, 2 km GEOS-FP replay (NASA GMAO)",
+      "when": "19 August 2025, 20:00 UTC"
+    }
   },
   {
     "id": "current",
@@ -108,6 +124,10 @@
     "measure": {
       "label": "sea temperature",
       "unit": "°C"
+    },
+    "data": {
+      "from": "ECCO2 ocean model (MIT and NASA JPL)",
+      "when": "March 2007 to March 2008"
     }
   },
   {
@@ -119,6 +139,10 @@
     "source": {
       "label": "NASA SVS: Change in Night Lights 2012–2023",
       "url": "https://svs.gsfc.nasa.gov/5313/"
+    },
+    "data": {
+      "from": "VIIRS on the Suomi NPP satellite, Black Marble (NASA and NOAA)",
+      "when": "Yearly averages, 2012 to 2023"
     }
   },
   {
@@ -141,6 +165,10 @@
     "source": {
       "label": "NASA SVS: Change in Night Lights 2012–2023",
       "url": "https://svs.gsfc.nasa.gov/5276/"
+    },
+    "data": {
+      "from": "VIIRS on the Suomi NPP satellite, Black Marble (NASA and NOAA)",
+      "when": "Yearly averages for 2012 and 2023"
     }
   },
   {
@@ -153,6 +181,10 @@
     "source": {
       "label": "NASA SVS: A 3D View of an Atmospheric River",
       "url": "https://svs.gsfc.nasa.gov/4960/"
+    },
+    "data": {
+      "from": "MERRA-2 reanalysis (NASA GMAO)",
+      "when": "Not given on the source page"
     }
   },
   {
@@ -165,6 +197,10 @@
     "source": {
       "label": "NASA SVS: GEDI Forest Height",
       "url": "https://svs.gsfc.nasa.gov/4950/"
+    },
+    "data": {
+      "from": "GEDI lidar on the International Space Station",
+      "when": "April 2019 to April 2020"
     }
   },
   {
@@ -183,6 +219,10 @@
       "east": 180,
       "north": 90,
       "south": -90
+    },
+    "data": {
+      "from": "Lightning Imaging Sensor on the International Space Station",
+      "when": "2017 to 2023"
     }
   },
   {
@@ -195,6 +235,10 @@
     "source": {
       "label": "NASA SVS: DYAMOND Global Carbon Dioxide",
       "url": "https://svs.gsfc.nasa.gov/5196/"
+    },
+    "data": {
+      "from": "GEOS model, DYAMOND run (NASA GMAO)",
+      "when": "January to March 2020"
     }
   },
   {
@@ -207,6 +251,10 @@
     "source": {
       "label": "NASA SVS: Perpetual Ocean 2",
       "url": "https://svs.gsfc.nasa.gov/5425/"
+    },
+    "data": {
+      "from": "ECCO2 ocean and sea-ice model (NASA JPL)",
+      "when": "2021 to 2023"
     }
   }
 ]

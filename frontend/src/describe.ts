@@ -4,7 +4,7 @@ import { placeOf, type Geo } from './geo'
 // What a track knows about its image, beyond the pixels.
 export interface TrackInfo {
   geo?: Geo // map edges, for naming places
-  measure?: { label: string; unit: string } // what the colour scale measures
+  measure?: { label: string; unit: string; digits?: number } // what the colour scale measures
   categories?: { hex: string; name: string }[] // named colours from the image's legend
 }
 
@@ -90,10 +90,14 @@ export function strongestSentence(r: AnalyzeResult, info?: TrackInfo) {
   return `Listen for the loudest moment, about ${secs(peak * r.stepSec)} in: that's ${p ? `over ${p}` : `${across(peak, r.columns)} of the image`}, where the signal is strongest.`
 }
 
+// "24 °C", or "0.35" for unitless indices.
+export const formatValue = (v: number, m: NonNullable<TrackInfo['measure']>) =>
+  `${Number(v.toFixed(m.digits ?? 0))}${m.unit ? ` ${m.unit}` : ''}`
+
 // A reading off the image's colour scale, e.g. "about 24 °C".
 export function valueAt(r: AnalyzeResult, col: number, info?: TrackInfo) {
   const v = r.columnStats[col].value
-  return info?.measure && v != null ? `about ${Math.round(v)} ${info.measure.unit}` : null
+  return info?.measure && v != null ? `about ${formatValue(v, info.measure)}` : null
 }
 
 // Coolest and warmest (or lowest and highest) readings across the image.
@@ -103,8 +107,8 @@ function rangeSentence(r: AnalyzeResult, info: TrackInfo | undefined, where: (co
   if (cols.length < 2) return ''
   const lo = cols.reduce((a, b) => (b.v < a.v ? b : a))
   const hi = cols.reduce((a, b) => (b.v > a.v ? b : a))
-  const u = info.measure.unit
-  return `${cap(info.measure.label)} runs from about ${Math.round(lo.v)} ${u} ${where(lo.i)} to about ${Math.round(hi.v)} ${u} ${where(hi.i)}.`
+  const f = (v: number) => formatValue(v, info.measure!)
+  return `${cap(info.measure.label)} runs from about ${f(lo.v)} ${where(lo.i)} to about ${f(hi.v)} ${where(hi.i)}.`
 }
 
 // A layer's name: the legend's word for its colour when the image has one (e.g. "dust").

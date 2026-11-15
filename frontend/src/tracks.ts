@@ -13,6 +13,8 @@ export interface Track extends TrackInfo {
   source: { label: string; url: string }
   frames?: { id: string; label: string }[] // a time-lapse: images played one after another
   scale?: string // the image's colour bar as "#rrggbb:value;...", sent to the engine
+  live?: { layer: string; date: string; then?: string } // a live NASA GIBS map, not a jukebox image
+  data?: { from: string; when: string } // instrument/model and period, for the "About this data" panel
 }
 
 // Frames from NASA's Earth Information Center visuals, made by the Scientific

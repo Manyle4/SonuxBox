@@ -2,6 +2,7 @@ import type { AnalysisMode, AnalyzeResult } from './api'
 import { describePiece, describeSeries } from './describe'
 import { TOUR, tourText, tourTrack } from './tour'
 import { framesOf, type Track } from './tracks'
+import { keyPhrase, phraseKey, soundKey } from './soundKey'
 
 // The words read out for a piece. The page and the narration build both use this,
 // so the recorded voice always says what's on screen.
@@ -44,6 +45,8 @@ export function allNarrations(load: (frameId: string, mode: AnalysisMode) => Ana
       const frames = framesOf(t)
       const results = frames.map((f) => load(f.id, mode))
       out[narrationKey(t, mode)] = speakable(narrationText(t, t.title, results, frames.map((f) => f.label)))
+      // Sound key phrases, shared between tracks.
+      for (const r of results) for (const it of soundKey(r, t)) out[phraseKey(keyPhrase(it))] = speakable(keyPhrase(it))
     }
   }
   // Tour steps play each track in its own default mode.

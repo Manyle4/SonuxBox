@@ -2,7 +2,7 @@
 
 **Hear NASA's views of our changing planet.** SonuxBox turns Earth-science imagery into music: carbon monoxide plumes, lightning, ocean currents, night lights. You can listen to the data, not just look at it.
 
-Built by **team SonuX** (Accra, Ghana) for the **NASA Space Apps Challenge 2026**, challenge
+Built by **team SonuX** (Jonathan Mensah, Eyram Afi Kudzawu-D'Pherdd and Elynam Yawah Kudzawu-D'Pherdd; Accra, Ghana) for the **NASA Space Apps Challenge 2026**, challenge
 [*The Earth Information Jukebox*](https://www.spaceappschallenge.org/2026/challenges/the-earth-information-jukebox/).
 
 - **Live site:** https://sonuxbox.vercel.app
@@ -15,6 +15,7 @@ NASA's Earth Information Center (EIC) makes stunning visualisations, but a pictu
 ## What it does
 
 - **An Earth Jukebox** of 12 tracks made from NASA EIC / Scientific Visualization Studio frames. Each track comes with what the data shows, what to listen for, and a link to its source.
+- **Live from NASA:** pick a layer (sea temperature, rain and snow, plant greenness, land temperature, or haze and smoke) and any day, and hear that day's whole planet, fetched straight from [NASA GIBS](https://earthdata.nasa.gov/gibs). Tick "an earlier day" to hear two days back to back. Values come from NASA's own colour table for the layer, pixel by pixel ("about 32 °C over the Sahara"). Links like `?live=sst&date=2026-11-12` open straight to a day.
 - **A time-lapse:** Ukraine's night lights in 2012, then 2023. You can hear the melody thin out as the lights go dark.
 - **A guided tour:** a narrated walk through carbon monoxide, aerosols, lightning and Ukraine, with a fact from each track's own data.
 - **Every colour gets an instrument:** on data maps, each distinct colour of the data plays its own line. In Aerosols, sulfate plays a soft pluck and dust plays bells, named from NASA's own legend.
@@ -27,12 +28,15 @@ NASA's Earth Information Center (EIC) makes stunning visualisations, but a pictu
 
 ### Accessibility
 
+- **A sound key:** like a map's colour bar, but for your ears. It plays what low and high, soft and loud, the drums and each colour's instrument mean in this piece, using notes from the piece itself. **Hear the key** speaks each entry first.
 - **Written description, with places:** "What you're hearing" explains each piece in plain words. On world maps it names places: "busiest over Alaska and northern Canada, South America and Central Africa… strongest over Central Africa". For a time-lapse, it compares the frames.
 - **A real voice:** **Read aloud** and the tour use narration recorded with the open [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) voice model. Each recording carries a fingerprint of its text, and if the text changes the page falls back to the browser's voice rather than play something out of date.
 - **Live captions:** a caption line says what's under the playhead ("Now: Central Africa, strong signal, note G5"). Screen readers can follow it with "Announce while playing".
 - **Explore mode:** hover, drag a finger, or use the arrow keys across the image to hear it one slice at a time. To a screen reader the image is a slider ("Central Africa, slice 18 of 32: strong signal, near the top, note G4"). Phones vibrate harder over stronger slices (Android).
 - **Themes and motion:** dark, light and high-contrast themes, chosen from your system settings to start with. Reduced motion turns off animation.
 - **Stereo:** the sound moves from your left ear to your right as the scan crosses the image.
+- **About this data:** each piece lists the instrument or model, the date, the units and what part of the image was ignored, with a link to the source.
+- **Phones:** bigger buttons on touch screens, and a small player stays at the bottom of the screen while you read.
 - **Keyboard:** everything works from the keyboard. Space plays and pauses, and status changes are announced.
 
 ## How an image becomes music
@@ -70,6 +74,8 @@ All images are frames from NASA visualisations listed in the challenge resources
 Colour scales come from SVS too: the [sea surface temperature bar](https://svs.gsfc.nasa.gov/3912/) and the [aerosol type legend](https://svs.gsfc.nasa.gov/5669/) (copies in `images/legends`).
 
 Inspiration: NASA's own sonification of [Caldwell 73](https://svs.gsfc.nasa.gov/13786/), which maps brightness and position to volume and pitch.
+
+Live maps come from [NASA GIBS](https://earthdata.nasa.gov/gibs) (the imagery behind [Worldview](https://worldview.earthdata.nasa.gov/)): MUR sea surface temperature, IMERG precipitation, MODIS NDVI, MODIS land surface temperature and MODIS aerosol optical depth, with their published colour tables.
 
 ## How it fits together
 
@@ -133,7 +139,7 @@ npm test             # unit tests
 - **Model files:** put `kokoro-v1.0.onnx` and `voices-v1.0.bin` from the [kokoro-onnx releases](https://github.com/thewh1teagle/kokoro-onnx/releases) in `tools/narration/models/`.
 
 **Tests:**
-- **Website:** `npm test` runs the unit tests: places, descriptions against the real tracks, time-lapses, narration fingerprints and the synth.
+- **Website:** `npm test` runs the unit tests: places, descriptions against the real tracks, time-lapses, narration fingerprints, the synth, the sound key, and reading live values from NASA colour tables.
 - **API:** `tools/test_api.sh [api-url]` runs every jukebox image through the API in both modes, and checks the error replies.
 - **CI:** GitHub Actions runs both on every push.
 

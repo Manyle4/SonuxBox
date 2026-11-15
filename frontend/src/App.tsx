@@ -11,7 +11,11 @@ import { ModeToggle } from './components/ModeToggle'
 import { PianoRoll } from './components/PianoRoll'
 import { PlayerBar } from './components/PlayerBar'
 import { describeCompare, describePiece, describeSeries } from './describe'
-import { setLink } from './link'
+import { setLink, setLiveLink } from './link'
+import { displayImage, fetchColormap, LIVE_LAYERS, liveTrack, parseColormap, pixelsOf, prettyDate, readValues, validDate, wmsUrl } from './live'
+import { LivePanel } from './components/LivePanel'
+import { SoundKey } from './components/SoundKey'
+import { DataPanel } from './components/DataPanel'
 import { narrationKey, narrationText } from './narration'
 import { speak, type Speech } from './speech'
 import { TOUR, tourText } from './tour'
@@ -26,6 +30,8 @@ interface Frame {
   name: string
   url: string
   label: string
+  // Live maps: real readings per slice from the layer's colour table, around a given height.
+  readAt?: (heights: (number | undefined)[]) => (number | undefined)[]
 }
 
 interface Source {
@@ -116,12 +122,21 @@ export default function App() {
         ),
       )
       if (ctrl.signal.aborted) return
+      // Live maps: put the exact readings in, when the slices line up.
+      res.forEach((r, i) => {
+        const read = src.frames[i].readAt
+        if (!read || r.columns !== 32) return
+        const v = read(r.columnStats.map((c) => c.peakPos ?? c.landPos))
+        r.columnStats = r.columnStats.map((c, j) => ({ ...c, value: v[j] }))
+      })
       setResults(res)
       setStatus('ready')
       setAnnounce(`${title} is ready. Press space to play, or focus the image to explore it slice by slice.`)
     } catch (e) {
       if (ctrl.signal.aborted) return
-      const message = e instanceof Error ? e.message : 'Something went wrong'
+      let message = e instanceof Error ? e.message : 'Something went wrong'
+      if (src.track?.live && /uniform|no signal/i.test(message))
+        message = 'NASA has no data for that day yet (or the map is empty). Try a day or two earlier.'
       setResults(null)
       setError(message)
       setStatus('error')
@@ -181,6 +196,44 @@ export default function App() {
     }
   }
 
+  // A live NASA map (or two days of one): fetch, read the real values, then play.
+  const [liveBusy, setLiveBusy] = useState(false)
+  const onLive = async (layerId: string, date: string, then?: string) => {
+    const layer = LIVE_LAYERS.find((l) => l.id === layerId)
+    if (!layer) return
+    setCompareId(null)
+    setLiveBusy(true)
+    setAnnounce(`Fetching ${layer.title} from NASA…`)
+    try {
+      const [xml, coast] = await Promise.all([
+        fetchColormap(layer.colormap).catch(() => null),
+        fetch(wmsUrl('Coastlines_15m', null)).then((r) => r.blob()).then((b) => createImageBitmap(b)).catch(() => null),
+      ])
+      const table = xml ? parseColormap(xml, layer.toUnit) : []
+      const days = then ? [then, date] : [date]
+      const frames = await Promise.all(
+        days.map(async (d) => {
+          const res = await fetch(wmsUrl(layer.gibs, d))
+          if (!res.ok || !res.headers.get('content-type')?.startsWith('image/')) throw new Error('gibs')
+          const blob = await res.blob()
+          const img = await createImageBitmap(blob)
+          const px = table.length ? pixelsOf(img) : null
+          const readAt = px ? (at: (number | undefined)[]) => readValues(px, img.width, img.height, table, 32, at) : undefined
+          const url = await displayImage(img, coast)
+          return { id: null, blob, name: `${layer.id}-${d}.png`, url, label: then ? prettyDate(d) : '', readAt }
+        }),
+      )
+      setMode('adaptive')
+      const track = liveTrack(layer, date, then)
+      setLiveLink(layer.id, date, then)
+      pickSource({ name: track.title, track, frames }, 'adaptive')
+    } catch {
+      fail("Couldn't get that map from NASA. Check your connection, or try another day.")
+    } finally {
+      setLiveBusy(false)
+    }
+  }
+
   // Changing mode re-runs the current image.
   const onMode = (m: AnalysisMode) => {
     setMode(m)
@@ -193,6 +246,11 @@ export default function App() {
     if (linkOpened.current) return
     linkOpened.current = true
     const q = new URLSearchParams(location.search)
+    const live = q.get('live'), day = q.get('date'), then = q.get('then')
+    if (live && validDate(day)) {
+      void onLive(live, day, validDate(then) && then < day ? then : undefined)
+      return
+    }
     const id = q.get('track')
     const m = q.get('mode')
     if (id) void onTrack(id, m === 'adaptive' || m === 'terrain' ? m : undefined)
@@ -205,7 +263,7 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName
-      if (e.code === 'Space' && status === 'ready' && !['BUTTON', 'INPUT', 'A'].includes(tag)) {
+      if (e.code === 'Space' && status === 'ready' && !['BUTTON', 'INPUT', 'A', 'SELECT', 'TEXTAREA', 'SUMMARY'].includes(tag)) {
         e.preventDefault()
         toggle()
       }
@@ -273,6 +331,7 @@ export default function App() {
 
   // The address bar follows the open track, its mode and any comparison, so it can be shared.
   useEffect(() => {
+    if (source?.track?.live) return // set when it was fetched
     if (source?.track) setLink(source.track.id, mode === source.track.mode ? null : mode, compareId)
   }, [source, mode, compareId])
 
@@ -290,18 +349,23 @@ export default function App() {
   const shownFrame = source?.frames[segIndex] ?? source?.frames[0]
 
   // Described at normal speed, so the pre-made narration always matches.
+  // Worked out once per piece, not on every frame of playback.
   const info = track ?? undefined
-  const description = !results || !source
-    ? ''
-    : series
-      ? describeSeries(results.map((r, i) => ({ result: r, label: source.frames[i].label })), title)
-      : describePiece(results[0], title, info)
-  const compareText = joined && 'compare' in joined && joined.compare && compareTrack
-    ? describeCompare(joined.segments[0].result, joined.compare, title, compareTrack.title, info)
-    : ''
-  const spoken = results && source
-    ? [narrationText(track, title, results, source.frames.map((f) => f.label)), compareText].filter(Boolean).join(' ')
-    : ''
+  const compareRes = joined && 'compare' in joined ? joined.compare : null
+  const { description, compareText, spoken } = useMemo(() => {
+    if (!results || !source) return { description: '', compareText: '', spoken: '' }
+    const t = source.track
+    const name = t?.title ?? source.name
+    const labels = source.frames.map((f) => f.label)
+    const description = results.length > 1
+      ? describeSeries(results.map((r, i) => ({ result: r, label: labels[i] })), name)
+      : describePiece(results[0], name, t ?? undefined)
+    const compareText = compareRes && compareTrack && results.length === 1
+      ? describeCompare(results[0], compareRes, name, compareTrack.title, t ?? undefined)
+      : ''
+    const spoken = [narrationText(t, name, results, labels), compareText].filter(Boolean).join(' ')
+    return { description, compareText, spoken }
+  }, [results, source, compareRes, compareTrack])
 
   const toggleLayer = (v: Voice) =>
     setMuted((old) => {
@@ -331,9 +395,21 @@ export default function App() {
           </h1>
           <ThemePicker />
         </div>
-        <p>An Earth Jukebox: hear NASA's views of our changing planet. Each slice of the image, left to right, becomes a beat.</p>
+        <p className="tagline">Hear NASA's view of Earth.</p>
+        <p>
+          Maps of our planet, played as music: each slice of the image, left to right, becomes a beat. Higher signal
+          plays higher notes, and stronger signal plays louder.
+        </p>
         {tourStep === null && (
-          <button className="tour-start" onClick={startTour}>▶ Take the guided tour</button>
+          <div className="cta">
+            <button className="tour-start" onClick={startTour}>▶ Take the guided tour · 2½ min</button>
+            <a className="cta-alt" href="#live" onClick={(e) => {
+              e.preventDefault()
+              const el = document.getElementById('live')
+              el?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' })
+              document.querySelector<HTMLSelectElement>('.live select')?.focus({ preventScroll: true })
+            }}>or hear this week's Earth, live</a>
+          </div>
         )}
       </header>
 
@@ -349,6 +425,8 @@ export default function App() {
         <section className="inputs" aria-label="Choose an image">
           <h2>Earth Jukebox</h2>
           <Gallery activeId={track?.id ?? null} onPick={(id) => { if (tourStep !== null) stopTour(); void onTrack(id) }} disabled={loading} />
+          <h2 id="live">Live from NASA</h2>
+          <LivePanel onPlay={(l, d, t) => { if (tourStep !== null) stopTour(); void onLive(l, d, t) }} busy={liveBusy} disabled={loading} />
           <h2>Or use your own image</h2>
           <Dropzone onFile={onFile} disabled={loading} />
           <ModeToggle mode={mode} onChange={onMode} disabled={loading} />
@@ -358,7 +436,12 @@ export default function App() {
           {!source && (
             <div className="empty">
               <p>Pick a track to hear it.</p>
-              <p className="sub">Higher features play higher notes. Busy areas play louder.</p>
+              <ul className="sub">
+                <li><b>Earth Jukebox</b>: 12 NASA visualisations, from wildfire smoke to lightning.</li>
+                <li><b>Live from NASA</b>: any day's sea temperature, rain, greenness, heat or haze.</li>
+                <li><b>Your own image</b>: drop in any map or picture.</li>
+              </ul>
+              <p className="sub">Works with a screen reader, a keyboard, or a finger: every piece is also described in words.</p>
             </div>
           )}
 
@@ -419,12 +502,12 @@ export default function App() {
               {ready && piece && seg && (
                 <>
                   <PlayerBar result={piece} playing={playing} time={time} duration={audio.duration}
-                    onToggle={toggle} onDownload={download} />
+                    onToggle={toggle} onDownload={download} title={title} />
                   <Mixer muted={muted} onToggle={toggleLayer} rate={rate} onRate={setRate}
                     reverb={reverb} onReverb={() => setReverb((r) => !r)}
                     hasPerc={piece.notes.some((n) => n.voice === 'perc')}
                     layers={(seg.result.layers ?? []).filter((l) => piece.notes.some((n) => n.voice === l.voice))} info={info} />
-                  {track && !series && (
+                  {track && !track.live && !series && (
                     <label className="compare-pick">
                       Compare with
                       <select value={compareId ?? ''} onChange={(e) => {
@@ -441,11 +524,12 @@ export default function App() {
                   <Caption result={seg.result} time={segTime} playing={playing} info={info} />
                   <PianoRoll result={piece} time={time} onSeek={seek} muted={muted} info={info}
                     marks={series ? joined.segments.map((s) => ({ at: s.start, label: s.label })) : []} />
+                  <SoundKey result={seg.result} info={info} onBusy={() => { if (playing) toggle() }} />
 
                   <section className="hearing" aria-labelledby="hearing-title">
                     <div className="hearing-head">
                       <h3 id="hearing-title">What you're hearing</h3>
-                      <ReadAloud text={spoken} recording={track ? narrationKey(track, mode) : undefined} />
+                      <ReadAloud text={spoken} recording={track && !track.live ? narrationKey(track, mode) : undefined} />
                     </div>
                     {track && <p className="about">{track.about} {track.listen}</p>}
                     <p>{description}</p>
@@ -467,6 +551,7 @@ export default function App() {
                       </ul>
                     </details>
                   </section>
+                  <DataPanel track={track} result={seg.result} />
                 </>
               )}
             </>
@@ -477,13 +562,20 @@ export default function App() {
       </main>
 
       <footer>
-        <p>Space plays and pauses. Click the image or the notes to jump around.</p>
+        <p className="keys">Space plays and pauses. Click the image or the notes to jump around.</p>
         <p>
-          Built by team SonuX for NASA Space Apps 2026. Imagery from NASA's{' '}
+          Built in Accra, Ghana by team SonuX (Jonathan Mensah, Eyram Afi Kudzawu-D'Pherdd and Elynam Yawah
+          Kudzawu-D'Pherdd) for <a href="https://www.spaceappschallenge.org/2026/challenges/the-earth-information-jukebox/"
+          target="_blank" rel="noreferrer">NASA Space Apps 2026: The Earth Information Jukebox</a>.{' '}
+          <a href="https://github.com/Manyle4/SonuxBox" target="_blank" rel="noreferrer">Source on GitHub</a>.
+        </p>
+        <p>
+          Imagery from NASA's{' '}
           <a href="https://svs.gsfc.nasa.gov/gallery/earth-information-center/" target="_blank" rel="noreferrer">
             Earth Information Center
           </a>{' '}
-          and Scientific Visualization Studio.
+          and Scientific Visualization Studio, and live maps from{' '}
+          <a href="https://earthdata.nasa.gov/gibs" target="_blank" rel="noreferrer">NASA GIBS</a>.
         </p>
       </footer>
     </div>

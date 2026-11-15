@@ -5,7 +5,7 @@ import { readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join, relative } from 'node:path'
 
 const dist = new URL('../dist/', import.meta.url).pathname
-const skip = new Set(['sw.js', 'offline.json', 'index.html'])
+const skip = new Set(['sw.js', 'offline.json', 'index.html', 'og.jpg', 'robots.txt']) // only for link previews and crawlers
 
 async function walk(dir) {
   const out = []
