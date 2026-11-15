@@ -12,6 +12,10 @@ import { PianoRoll } from './components/PianoRoll'
 import { PlayerBar } from './components/PlayerBar'
 import { describePiece, describeSeries } from './describe'
 import { setLink } from './link'
+import { narrationKey, narrationText } from './narration'
+import { speak, type Speech } from './speech'
+import { TOUR, tourText } from './tour'
+import { TourBar } from './components/TourBar'
 import { joinFrames, segmentAt } from './series'
 import { framesOf, imageUrl, prerendered, TRACKS, type Track } from './tracks'
 
@@ -175,6 +179,63 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [status, toggle])
 
+  // ---- Guided tour: words, then the track, then the next step ----
+  const [tourStep, setTourStep] = useState<number | null>(null)
+  const [tourPhase, setTourPhase] = useState<'load' | 'talk' | 'play'>('talk')
+  const speechRef = useRef<Speech | null>(null)
+  const wasPlaying = useRef(false)
+
+  const stopTour = () => {
+    speechRef.current?.stop()
+    if (playing) toggle()
+    setTourStep(null)
+  }
+  const nextStep = useCallback(() => {
+    speechRef.current?.stop()
+    setTourStep((i) => (i === null || i + 1 >= TOUR.length ? null : i + 1))
+  }, [])
+  const startTour = () => {
+    audio.unlock()
+    setTourStep(0)
+  }
+
+  // A new step: load its track, or just talk.
+  useEffect(() => {
+    if (tourStep === null) return
+    const step = TOUR[tourStep]
+    if (step.track) {
+      setTourPhase('load')
+      void onTrack(step.track)
+    } else {
+      setTourPhase('talk')
+      const sp = speak(tourText(step, null, []), step.key)
+      speechRef.current = sp
+      void sp.done.then(() => setTourStep((i) => (i === tourStep ? (i + 1 < TOUR.length ? i + 1 : null) : i)))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tourStep])
+
+  // Track ready: say the words, then play it.
+  useEffect(() => {
+    if (tourStep === null || tourPhase !== 'load') return
+    const step = TOUR[tourStep]
+    if (status !== 'ready' || !audio.ready || !source || source.track?.id !== step.track || !results) return
+    setTourPhase('talk')
+    const sp = speak(tourText(step, results, source.frames.map((f) => f.label)), step.key)
+    speechRef.current = sp
+    void sp.done.then(() => {
+      if (speechRef.current !== sp) return // skipped or stopped meanwhile
+      setTourPhase('play')
+      seek(0)
+    })
+  }, [tourStep, tourPhase, status, audio.ready, source, results, seek])
+
+  // Track finished on its own (not paused): next step.
+  useEffect(() => {
+    if (tourStep !== null && tourPhase === 'play' && wasPlaying.current && !playing && time === 0) nextStep()
+    wasPlaying.current = playing
+  }, [playing, time, tourStep, tourPhase, nextStep])
+
   const loading = status === 'loading'
   const track = source?.track ?? null
   const title = track?.title ?? source?.name ?? ''
@@ -195,6 +256,7 @@ export default function App() {
     : series
       ? describeSeries(results.map((r, i) => ({ result: r, label: source.frames[i].label })), title)
       : describePiece(results[0], title, geo)
+  const spoken = results && source ? narrationText(track, title, results, source.frames.map((f) => f.label)) : ''
 
   const toggleLayer = (v: Voice) =>
     setMuted((old) => {
@@ -222,14 +284,23 @@ export default function App() {
           Sonux<span>Box</span>
         </h1>
         <p>An Earth Jukebox: hear NASA's views of our changing planet. Each slice of the image, left to right, becomes a beat.</p>
+        {tourStep === null && (
+          <button className="tour-start" onClick={startTour}>▶ Take the guided tour</button>
+        )}
       </header>
+
+      {tourStep !== null && (
+        <TourBar step={tourStep} total={TOUR.length} phase={tourPhase}
+          title={TOUR[tourStep].track ? (track?.title ?? '') : tourStep === 0 ? 'Welcome' : 'The end'}
+          onSkip={nextStep} onStop={stopTour} />
+      )}
 
       <p className="sr-only" role="status" aria-live="polite">{announce}</p>
 
       <main>
         <section className="inputs" aria-label="Choose an image">
           <h2>Earth Jukebox</h2>
-          <Gallery activeId={track?.id ?? null} onPick={onTrack} disabled={loading} />
+          <Gallery activeId={track?.id ?? null} onPick={(id) => { if (tourStep !== null) stopTour(); void onTrack(id) }} disabled={loading} />
           <h2>Or use your own image</h2>
           <Dropzone onFile={onFile} disabled={loading} />
           <ModeToggle mode={mode} onChange={onMode} disabled={loading} />
@@ -301,7 +372,7 @@ export default function App() {
                   <section className="hearing" aria-labelledby="hearing-title">
                     <div className="hearing-head">
                       <h3 id="hearing-title">What you're hearing</h3>
-                      <ReadAloud text={[track ? `${track.about} ${track.listen}` : '', description].join(' ')} />
+                      <ReadAloud text={spoken} recording={track ? narrationKey(track, mode) : undefined} />
                     </div>
                     {track && <p className="about">{track.about} {track.listen}</p>}
                     <p>{description}</p>

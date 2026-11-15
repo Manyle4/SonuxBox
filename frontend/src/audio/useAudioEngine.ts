@@ -233,5 +233,8 @@ export function useAudioEngine(notes: Note[] | null, gridSec: number, muted: Set
     return encodeWav(mix.getChannelData(0), mix.getChannelData(1), SAMPLE_RATE)
   }, [rendered])
 
-  return { ready: !!rendered && !rendering, rendering, playing, time, duration, toggle, seek, exportWav }
+  // Call from a click, so later (async) playback is allowed to make sound.
+  const unlock = useCallback(() => void ctx().resume(), [])
+
+  return { ready: !!rendered && !rendering, rendering, playing, time, duration, toggle, seek, exportWav, unlock }
 }

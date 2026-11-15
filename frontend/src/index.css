@@ -200,3 +200,12 @@ footer a { color: var(--muted); }
 .caption p { margin: 0; font-variant-numeric: tabular-nums; }
 .caption .now { display: inline-block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent-ink); background: var(--accent); border-radius: 4px; padding: 1px 6px; margin-right: 6px; }
 .caption label { font-size: 0.8rem; color: var(--muted); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+
+/* ---- guided tour ---- */
+.tour-start { margin-top: 12px; padding: 8px 16px; border-radius: 999px; border: 0; background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.tour-start:hover { filter: brightness(1.1); }
+.tourbar { position: sticky; top: 8px; z-index: 5; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-top: 16px; padding: 10px 14px; border-radius: var(--radius); background: var(--panel-2); border: 1px solid var(--accent); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); }
+.tour-step { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); }
+.tour-phase { color: var(--muted); font-size: 0.9rem; }
+.tour-actions { margin-left: auto; display: flex; gap: 6px; }
+.tour-actions button { font-size: 0.85rem; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); }

@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "prerender": "node scripts/prerender.mjs"
+    "prerender": "node scripts/prerender.mjs",
+    "narration": "vite build --ssr scripts/narration-texts.ts --outDir .narration-build --emptyOutDir && node .narration-build/narration-texts.js | ../tools/narration/.venv/bin/python ../tools/narration/speak.py"
   },
   "dependencies": {
     "react": "^19.3.1",

@@ -73,6 +73,14 @@ function mainPlaces(r: AnalyzeResult, infos: ColumnInfo[], from: number, to: num
   return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]
 }
 
+// One line on where the signal peaks, for the tour.
+export function strongestSentence(r: AnalyzeResult, geo?: Geo) {
+  const infos = r.columnStats.map((_, i) => columnInfo(r, i))
+  const peak = infos.reduce((top, c, i) => (c.strength > infos[top].strength ? i : top), 0)
+  const p = placeAt(r, peak, geo)
+  return `Listen for the loudest moment, about ${secs(peak * r.stepSec)} in: that's ${p ? `over ${p}` : `${across(peak, r.columns)} of the image`}, where the signal is strongest.`
+}
+
 // A few sentences describing the whole piece, built from the same numbers that made the music.
 export function describePiece(r: AnalyzeResult, title: string, geo?: Geo) {
   const cols = r.columnStats
@@ -103,7 +111,7 @@ export function describePiece(r: AnalyzeResult, title: string, geo?: Geo) {
     return p ? `over ${p}` : `at ${across(col, r.columns)}`
   }
   const sentences = [
-    `${title}, played as a ${secs(r.musicSec)} piece in ${r.scale} at ${Math.round(r.bpm)} beats per minute.`,
+    `${title} plays for about ${secs(r.musicSec)}, in ${r.scale} at ${Math.round(r.bpm)} beats per minute.`,
     'The image is read from left to right, one slice per beat.',
     best.to >= best.from
       ? (geo
