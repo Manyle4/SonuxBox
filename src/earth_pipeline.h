@@ -30,6 +30,7 @@ struct ColumnStats {
     double landFraction = 0.0;                     // vegetation + land + ice together
     double landPos = 0.5;                          // vertical centre of the land: 0 = bottom, 1 = top
     double peakPos = 0.5;                          // height of the strongest band (for naming places)
+    double value = -1.0;                           // median value read off a colour scale; -1 = none
 };
 
 // Height (0 bottom .. 1 top) of the strongest band in a column's per-row totals.
@@ -432,7 +433,9 @@ inline std::string buildJson(const std::string& imageName, const std::string& au
         const ColumnStats& col = r.analysis.columns[c];
         f << "    {\"land\": " << col.landFraction
           << ", \"ocean\": " << col.fraction[static_cast<int>(Terrain::Ocean)]
-          << ", \"landPos\": " << col.landPos << ", \"peakPos\": " << col.peakPos << "}" << (c + 1 < kColumns ? "," : "") << "\n";
+          << ", \"landPos\": " << col.landPos << ", \"peakPos\": " << col.peakPos;
+        if (col.value >= 0.0) f << ", \"value\": " << col.value;
+        f << "}" << (c + 1 < kColumns ? "," : "") << "\n";
     }
     f << "  ],\n";
 

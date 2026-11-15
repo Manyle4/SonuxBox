@@ -154,6 +154,7 @@ int main() {
         std::string modeText = req.get_param_value("mode");
         std::string cropText = req.get_param_value("crop");
         std::string cropTopText = req.get_param_value("cropTop");
+        std::string scaleText = req.get_param_value("scale");
         std::string imageName = "upload";
         std::string formBytes;
         const std::string* bytes = &req.body;
@@ -172,6 +173,7 @@ int main() {
             }
             if (cropText.empty() && req.form.has_field("crop")) cropText = req.form.get_field("crop");
             if (cropTopText.empty() && req.form.has_field("cropTop")) cropTopText = req.form.get_field("cropTop");
+            if (scaleText.empty() && req.form.has_field("scale")) scaleText = req.form.get_field("scale");
         }
 
         AnalysisMode mode;
@@ -194,6 +196,12 @@ int main() {
         double crop = kCropBottom, cropTop = 0.0;
         if (!parseCrop(cropText, kCropBottom, crop) || !parseCrop(cropTopText, 0.0, cropTop)) {
             sendError(res, 400, "crop and cropTop must be numbers from 0 to 0.3");
+            return;
+        }
+        // scale = a colour bar as "#rrggbb:value;..."; each column then gets a real value.
+        std::vector<ScaleStop> scaleStops;
+        if (!scaleText.empty() && !parseScale(scaleText, scaleStops)) {
+            sendError(res, 400, "scale must look like #rrggbb:value;#rrggbb:value (2 to 256 stops)");
             return;
         }
         if (bytes->empty()) {
@@ -223,7 +231,7 @@ int main() {
 
             EarthResult result;
             std::string error;
-            if (!generateMusic(image, kSampleRate, mode, result, error, false, crop, cropTop)) {
+            if (!generateMusic(image, kSampleRate, mode, result, error, false, crop, cropTop, scaleStops)) {
                 sendError(res, 422, error);
                 return;
             }
