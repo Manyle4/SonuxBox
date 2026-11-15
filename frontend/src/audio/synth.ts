@@ -2,7 +2,7 @@
 // plus stereo: each sound is panned by where it sits across the image.
 import type { Note, Voice } from '../api'
 
-export const VOICES: Voice[] = ['melody', 'bass', 'pad', 'perc']
+export const VOICES: Voice[] = ['melody', 'bass', 'pad', 'perc', 'pluck', 'bell']
 
 interface Instrument {
   attack: number
@@ -22,12 +22,14 @@ const INSTRUMENTS: Record<Voice, Instrument> = {
   bass: { attack: 0.04, decay: 0.1, sustain: 0.85, release: 0.5, harmonics: [1, 0.5, 0.25, 0.1], unison: 1, detuneCents: 0, vibrato: 0, gain: 0.32 },
   pad: { attack: 0.7, decay: 0.3, sustain: 0.85, release: 1.4, harmonics: [1, 0.5, 0.33, 0.25], unison: 3, detuneCents: 7, vibrato: 0, gain: 0.09 },
   perc: { attack: 0.001, decay: 0, sustain: 1, release: 0, harmonics: [], unison: 1, detuneCents: 0, vibrato: 0, gain: 0.22 },
+  pluck: { attack: 0.004, decay: 0.35, sustain: 0, release: 0.15, harmonics: [1, 0.6, 0.4, 0.25, 0.15, 0.1], unison: 1, detuneCents: 0, vibrato: 0, gain: 0.2 },
+  bell: { attack: 0.002, decay: 1.2, sustain: 0, release: 0.6, harmonics: [1, 0, 0.45, 0, 0.2, 0], unison: 1, detuneCents: 0, vibrato: 0, gain: 0.14 },
 }
 
 const TWO_PI = Math.PI * 2
 const VIBRATO_RATE = 5.5
 // How far sounds pan: melody and drums follow the image closely, bass and pad stay nearer the middle.
-const PAN_WIDTH: Record<Voice, number> = { melody: 0.85, perc: 0.85, bass: 0.35, pad: 0.35 }
+const PAN_WIDTH: Record<Voice, number> = { melody: 0.85, perc: 0.85, bass: 0.35, pad: 0.35, pluck: 0.85, bell: 0.85 }
 
 const midiToFreq = (midi: number) => 440 * 2 ** ((midi - 69) / 12)
 
@@ -118,10 +120,10 @@ export function renderStems(notes: Note[], sampleRate: number, gridSec: number):
   return { stems, length, peak }
 }
 
-// Noise click over a low thump, same recipe (and seed) as renderHit() in synth.h.
+// Noise click over a low thump, same recipe (and fixed seed) as renderHit() in synth.h.
 function renderHit(stem: Stem, n: Note, inst: Instrument, sampleRate: number, first: number, gl: number, gr: number) {
   const count = Math.floor(n.dur * sampleRate)
-  let seed = (12345 + first) >>> 0
+  let seed = 12345 // same noise every hit, like a real drum
   for (let i = 0; i < count && first + i < stem.left.length; i++) {
     const t = i / sampleRate
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0

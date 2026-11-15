@@ -59,11 +59,11 @@ inline double adsr(double t, double noteDur, const Instrument& in) {
 }
 
 // A drum-like hit: noise that dies away fast, plus a short low sine "thump".
-// The noise uses a fixed seed so the same image always sounds the same.
+// The noise uses a fixed seed, so every hit (and every render) sounds the same.
 inline void renderHit(std::vector<float>& out, const NoteEvent& n, const Instrument& in, int sampleRate) {
     const std::size_t first = static_cast<std::size_t>(n.startSec * sampleRate);
     const std::size_t count = static_cast<std::size_t>(n.durationSec * sampleRate);
-    std::uint32_t seed = 12345u + static_cast<std::uint32_t>(first);
+    std::uint32_t seed = 12345u;  // same noise every hit, like a real drum
     for (std::size_t i = 0; i < count && first + i < out.size(); ++i) {
         const double t = static_cast<double>(i) / sampleRate;
         seed = seed * 1664525u + 1013904223u;  // cheap random numbers
