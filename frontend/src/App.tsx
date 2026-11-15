@@ -364,7 +364,8 @@ export default function App() {
                     onToggle={toggle} onDownload={download} />
                   <Mixer muted={muted} onToggle={toggleLayer} rate={rate} onRate={setRate}
                     reverb={reverb} onReverb={() => setReverb((r) => !r)}
-                    hasPerc={piece.notes.some((n) => n.voice === 'perc')} />
+                    hasPerc={piece.notes.some((n) => n.voice === 'perc')}
+                    layers={(seg.result.layers ?? []).filter((l) => piece.notes.some((n) => n.voice === l.voice))} />
                   <Caption result={seg.result} time={segTime} playing={playing} geo={geo} />
                   <PianoRoll result={piece} time={time} onSeek={seek} muted={muted}
                     marks={series ? joined.segments.map((s) => ({ at: s.start, label: s.label })) : []} />

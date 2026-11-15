@@ -81,6 +81,14 @@ export function strongestSentence(r: AnalyzeResult, geo?: Geo) {
   return `Listen for the loudest moment, about ${secs(peak * r.stepSec)} in: that's ${p ? `over ${p}` : `${across(peak, r.columns)} of the image`}, where the signal is strongest.`
 }
 
+// Which colours got their own instrument (only those that actually play).
+function layerSentence(r: AnalyzeResult) {
+  const playing = (r.layers ?? []).filter((l) => r.notes.some((n) => n.voice === l.voice))
+  if (!playing.length) return ''
+  const parts = playing.map((l) => `the ${l.color} areas play ${l.voice === 'bell' ? 'bells' : 'a soft pluck'}`)
+  return `Each colour has its own instrument: ${parts.join(', and ')}.`
+}
+
 // A few sentences describing the whole piece, built from the same numbers that made the music.
 export function describePiece(r: AnalyzeResult, title: string, geo?: Geo) {
   const cols = r.columnStats
@@ -130,6 +138,7 @@ export function describePiece(r: AnalyzeResult, title: string, geo?: Geo) {
     hits > 0
       ? `${hits} drum ${hits === 1 ? 'hit marks' : 'hits mark'} places where the signal jumps up suddenly.`
       : '',
+    layerSentence(r),
   ]
   return sentences.filter(Boolean).join(' ')
 }

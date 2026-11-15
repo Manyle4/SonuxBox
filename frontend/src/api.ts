@@ -7,7 +7,7 @@ export const API_URL = (
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 
 export type AnalysisMode = 'adaptive' | 'terrain'
-export type Voice = 'melody' | 'bass' | 'pad' | 'perc'
+export type Voice = 'melody' | 'bass' | 'pad' | 'perc' | 'pluck' | 'bell'
 
 export interface Note {
   start: number // seconds
@@ -23,6 +23,13 @@ export interface ColumnStat {
   ocean: number // quiet share in adaptive mode
   landPos: number // 0 = bottom, 1 = top
   peakPos?: number // height of the strongest band (newer engine only)
+}
+
+export interface Layer {
+  color: string // e.g. "purple"
+  hex: string
+  share: number // of the signal
+  voice: 'pluck' | 'bell'
 }
 
 export interface AnalyzeResult {
@@ -42,6 +49,7 @@ export interface AnalyzeResult {
   durationSec: number // includes the fade-out tail
   share: Record<string, number>
   columnStats: ColumnStat[]
+  layers?: Layer[] // colour layers with their own instrument (adaptive mode, newer engine)
   notes: Note[]
 }
 

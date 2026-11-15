@@ -209,3 +209,7 @@ footer a { color: var(--muted); }
 .tour-phase { color: var(--muted); font-size: 0.9rem; }
 .tour-actions { margin-left: auto; display: flex; gap: 6px; }
 .tour-actions button { font-size: 0.85rem; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); }
+
+/* ---- colour layers ---- */
+.mixer .layer.pluck::before, .mixer .layer.bell::before { background: var(--swatch, var(--muted)); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35); }
+.key.layerkey::before { background: var(--swatch); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55); }

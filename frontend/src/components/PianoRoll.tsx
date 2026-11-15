@@ -24,8 +24,10 @@ export function PianoRoll({ result, time, onSeek, muted, marks = [] }: Props) {
   const x = (sec: number) => (sec / total) * W
 
   // Draw pad first and melody last, so the melody sits on top.
-  const order = { pad: 0, bass: 1, melody: 2 }
-  const notes = [...pitched].sort((a, b) => order[a.voice as 'pad' | 'bass' | 'melody'] - order[b.voice as 'pad' | 'bass' | 'melody'])
+  const order: Record<string, number> = { pad: 0, bass: 1, pluck: 2, bell: 3, melody: 4 }
+  const notes = [...pitched].sort((a, b) => order[a.voice] - order[b.voice])
+  // Colour layers draw in their own colour.
+  const layerFill = Object.fromEntries((result.layers ?? []).map((l) => [l.voice, l.hex]))
 
   const seekFromClick = (e: MouseEvent<SVGSVGElement>) => {
     const box = e.currentTarget.getBoundingClientRect()
@@ -52,6 +54,8 @@ export function PianoRoll({ result, time, onSeek, muted, marks = [] }: Props) {
               height={Math.max(rowH - 2, 2)}
               rx={2}
               opacity={0.35 + 0.65 * n.vel}
+              style={layerFill[n.voice] && !active ? { fill: layerFill[n.voice] } : undefined}
+              {...(layerFill[n.voice] && { stroke: 'rgba(255,255,255,0.55)', strokeWidth: 1, vectorEffect: 'non-scaling-stroke' })}
             />
           )
         })}
@@ -79,6 +83,11 @@ export function PianoRoll({ result, time, onSeek, muted, marks = [] }: Props) {
         <span className="key bass">Bass</span>
         <span className="key pad">Pad</span>
         {hits.length > 0 && <span className="key perc">Drums</span>}
+        {(result.layers ?? []).filter((l) => result.notes.some((n) => n.voice === l.voice)).map((l) => (
+          <span key={l.voice} className="key layerkey" style={{ '--swatch': l.hex } as React.CSSProperties}>
+            {l.color[0].toUpperCase() + l.color.slice(1)} ({l.voice})
+          </span>
+        ))}
       </figcaption>
     </figure>
   )
