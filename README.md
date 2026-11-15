@@ -14,7 +14,9 @@ NASA's Earth Information Center (EIC) makes stunning visualisations, but a pictu
 
 ## What it does
 
-- **An Earth Jukebox** of 12 tracks made from NASA EIC / Scientific Visualization Studio frames. Each track comes with what the data shows, what to listen for, and a link to its source.
+- **An actual jukebox:** 12 records made from NASA EIC / Scientific Visualization Studio frames, each with a selection code (A1 to D3). Tap a card, or type a code like B3 on the keyboard or the keypad. Picks queue up and play in turn, with play all, shuffle, next and previous. The record that's playing spins with its own map on it, and the needle tracks the music.
+- **Stations:** endless playlists of live NASA data. Ocean radio plays the last 30 days of sea temperature, Storm watch the last week of rain, and This week on Earth every live layer. The next day is fetched and composed while the current one plays, so there's no gap.
+- **Liner notes:** under the machine, every record has its map, notes, sound key, description and data panel, with what the data shows, what to listen for, and a link to its source.
 - **Live from NASA:** pick a layer (sea temperature, rain and snow, plant greenness, land temperature, or haze and smoke) and any day, and hear that day's whole planet, fetched straight from [NASA GIBS](https://earthdata.nasa.gov/gibs). Tick "an earlier day" to hear two days back to back. Values come from NASA's own colour table for the layer, pixel by pixel ("about 32 °C over the Sahara"). Links like `?live=sst&date=2026-11-12` open straight to a day.
 - **A time-lapse:** Ukraine's night lights in 2012, then 2023. You can hear the melody thin out as the lights go dark.
 - **A guided tour:** a narrated walk through carbon monoxide, aerosols, lightning and Ukraine, with a fact from each track's own data.

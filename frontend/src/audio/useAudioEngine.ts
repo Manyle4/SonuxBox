@@ -20,6 +20,7 @@ export function useAudioEngine(notes: Note[] | null, gridSec: number, muted: Set
   const [rendering, setRendering] = useState(false)
   const [playing, setPlaying] = useState(false)
   const [time, setTime] = useState(0)
+  const [ends, setEnds] = useState(0) // counts pieces that played to the end (not paused or replaced)
 
   const workerRef = useRef<Worker | null>(null)
   const reqId = useRef(0)
@@ -180,6 +181,7 @@ export function useAudioEngine(notes: Note[] | null, gridSec: number, muted: Set
           offsetRef.current = 0
           timeRef.current = 0
           setTime(0)
+          setEnds((n) => n + 1)
           return
         }
         timeRef.current = t
@@ -238,5 +240,5 @@ export function useAudioEngine(notes: Note[] | null, gridSec: number, muted: Set
   // False when the browser hasn't let us make sound yet (no click so far).
   const canPlay = useCallback(() => ctxRef.current?.state === 'running', [])
 
-  return { ready: !!rendered && !rendering, rendering, playing, time, duration, toggle, seek, exportWav, unlock, canPlay }
+  return { ready: !!rendered && !rendering, rendering, playing, time, duration, ends, toggle, seek, exportWav, unlock, canPlay }
 }

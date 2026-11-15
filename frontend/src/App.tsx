@@ -4,7 +4,7 @@ import { useAudioEngine } from './audio/useAudioEngine'
 import { Dropzone } from './components/Dropzone'
 import { Caption } from './components/Caption'
 import { CopyLink, ReadAloud } from './components/Extras'
-import { Gallery } from './components/Gallery'
+import { Jukebox, type NowPlaying } from './components/Jukebox'
 import { MapView } from './components/MapView'
 import { Mixer } from './components/Mixer'
 import { ModeToggle } from './components/ModeToggle'
@@ -23,6 +23,8 @@ import { TourBar } from './components/TourBar'
 import { ThemePicker } from './components/ThemePicker'
 import { joinFrames, segmentAt } from './series'
 import { framesOf, imageUrl, prerendered, TRACKS, trackUrl, type Track } from './tracks'
+import { ALL_TRACKS, codeOfTrack, itemKey, itemLabel, shuffled, STATIONS, type QItem } from './queue'
+import type { LiveLayer } from './live'
 
 interface Frame {
   id: string | null // jukebox image id; null for uploads
@@ -32,6 +34,7 @@ interface Frame {
   label: string
   // Live maps: real readings per slice from the layer's colour table, around a given height.
   readAt?: (heights: (number | undefined)[]) => (number | undefined)[]
+  cacheKey?: string // live frames are cached, so the next one can be fetched ahead of time
 }
 
 interface Source {
@@ -115,6 +118,20 @@ export default function App() {
     fetch(`${API_URL}/api/health`).catch(() => {})
   }, [])
 
+  // Live maps get composed ahead of time while the previous piece plays, so they're kept.
+  const analyzeCache = useRef(new Map<string, Promise<AnalyzeResult>>())
+  const analyzeCached = useCallback((f: Frame, m: AnalysisMode) => {
+    const key = `${f.cacheKey}|${m}`
+    let p = analyzeCache.current.get(key)
+    if (!p) {
+      p = analyze(f.blob, f.name, m, 0, undefined, 0)
+      p.catch(() => analyzeCache.current.delete(key))
+      analyzeCache.current.set(key, p)
+      while (analyzeCache.current.size > 8) analyzeCache.current.delete(analyzeCache.current.keys().next().value!)
+    }
+    return p
+  }, [])
+
   const run = useCallback(async (src: Source, m: AnalysisMode) => {
     abortRef.current?.abort()
     const ctrl = new AbortController()
@@ -134,6 +151,7 @@ export default function App() {
         src.frames.map(
           async (f) =>
             (f.id && (await prerendered(f.id, m))) ||
+            (f.cacheKey ? await analyzeCached(f, m) : null) ||
             (await analyze(f.blob, f.name, m, src.track?.crop, ctrl.signal, src.track?.cropTop, src.track?.scale)),
         ),
       )
@@ -161,23 +179,15 @@ export default function App() {
     } finally {
       clearTimeout(slowTimer)
     }
-  }, [])
+  }, [analyzeCached])
 
   const pickSource = (src: Source, m: AnalysisMode) => {
     setSource((old) => {
-      for (const f of old?.frames ?? []) if (!f.id) URL.revokeObjectURL(f.url)
+      for (const f of old?.frames ?? []) if (!f.id && !f.cacheKey) URL.revokeObjectURL(f.url)
       return src
     })
     void run(src, m)
   }
-
-  // On phones the player sits below the jukebox, so bring it into view once it's drawn.
-  useEffect(() => {
-    if (source && window.matchMedia('(max-width: 860px)').matches) {
-      const still = matchMedia('(prefers-reduced-motion: reduce)').matches
-      stageRef.current?.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'start' })
-    }
-  }, [source])
 
   const fail = (message: string) => {
     autoplay.current = false
@@ -217,6 +227,39 @@ export default function App() {
     }
   }
 
+  // A live NASA map (or two days of one): fetch, read the real values. Cached, so the
+  // jukebox can fetch the next day while this one plays.
+  const liveCache = useRef(new Map<string, Promise<Frame[]>>())
+  const getLiveFrames = (layer: LiveLayer, date: string, then?: string) => {
+    const key = `${layer.id}|${date}|${then ?? ''}`
+    let p = liveCache.current.get(key)
+    if (p) return p
+    p = (async () => {
+      // Colour table, coastlines and every tile of every day, all at once.
+      const days = then ? [then, date] : [date]
+      const [xml, coast, ...maps] = await Promise.all([
+        fetchColormap(layer.colormap).catch(() => null),
+        coastlines(),
+        ...days.map((d) => fetchWorld(layer.gibs, layer.tiles, d)),
+      ])
+      const table = xml ? parseColormap(xml, layer.toUnit) : []
+      return Promise.all(
+        days.map(async (d, i): Promise<Frame> => {
+          const map = maps[i]
+          if (!map) throw new Error('gibs')
+          const px = table.length ? pixelsOf(map) : null
+          const readAt = px ? (at: (number | undefined)[]) => readValues(px, map.width, map.height, table, 32, at) : undefined
+          const [blob, url] = await Promise.all([pngOf(map), displayImage(map, coast)])
+          return { id: null, blob, name: `${layer.id}-${d}.png`, url, label: then ? prettyDate(d) : '', readAt, cacheKey: `${layer.id}|${d}` }
+        }),
+      )
+    })()
+    p.catch(() => liveCache.current.delete(key))
+    liveCache.current.set(key, p)
+    while (liveCache.current.size > 4) liveCache.current.delete(liveCache.current.keys().next().value!)
+    return p
+  }
+
   // A live NASA map (or two days of one): fetch, read the real values, then play.
   const [liveBusy, setLiveBusy] = useState(false)
   const [liveError, setLiveError] = useState<string | null>(null)
@@ -229,24 +272,7 @@ export default function App() {
     setLiveBusy(true)
     setAnnounce(`Fetching ${layer.title} from NASA…`)
     try {
-      // Colour table, coastlines and every tile of every day, all at once.
-      const days = then ? [then, date] : [date]
-      const [xml, coast, ...maps] = await Promise.all([
-        fetchColormap(layer.colormap).catch(() => null),
-        coastlines(),
-        ...days.map((d) => fetchWorld(layer.gibs, layer.tiles, d)),
-      ])
-      const table = xml ? parseColormap(xml, layer.toUnit) : []
-      const frames = await Promise.all(
-        days.map(async (d, i) => {
-          const map = maps[i]
-          if (!map) throw new Error('gibs')
-          const px = table.length ? pixelsOf(map) : null
-          const readAt = px ? (at: (number | undefined)[]) => readValues(px, map.width, map.height, table, 32, at) : undefined
-          const [blob, url] = await Promise.all([pngOf(map), displayImage(map, coast)])
-          return { id: null, blob, name: `${layer.id}-${d}.png`, url, label: then ? prettyDate(d) : '', readAt }
-        }),
-      )
+      const frames = await getLiveFrames(layer, date, then)
       if (pick !== pickId.current) return // something else was picked meanwhile
       setMode('adaptive')
       const track = liveTrack(layer, date, then)
@@ -389,11 +415,118 @@ export default function App() {
       ? !!track.live && track.live.layer === t.live.layer && track.live.date === t.live.date && track.live.then === t.live.then
       : !track.live && track.id === t.id)
 
+  // ---- The jukebox: a queue, stations, and moving on when a piece ends ----
+  type Queued = QItem & { station?: boolean } // station days sit behind anything you picked
+  const [queue, setQueue] = useState<Queued[]>([])
+  const [stationId, setStationId] = useState<string | null>(null)
+  const station = STATIONS.find((s) => s.id === stationId) ?? null
+  const [jbMsg, setJbMsg] = useState('')
+  const history = useRef<QItem[]>([])
+  const currentItem: QItem | null = !track
+    ? null
+    : track.live
+      ? { kind: 'live', layer: track.live.layer, date: track.live.date, then: track.live.then }
+      : { kind: 'track', id: track.id }
+  const currentKey = currentItem ? itemKey(currentItem) : null
+
+  const say = (text: string) => {
+    setJbMsg(text)
+    setAnnounce(text)
+  }
+  const load = (q: QItem, remember = true) => {
+    if (tourStep !== null) stopTour()
+    if (remember && currentItem && itemKey(currentItem) !== itemKey(q)) history.current = [...history.current.slice(-19), currentItem]
+    // Lift the needle now: if the old record ran out while the new one downloads, the queue would skip ahead.
+    if (playing) toggle()
+    userPlay()
+    if (q.kind === 'track') void onTrack(q.id)
+    else void onLive(q.layer, q.date, q.then)
+  }
+  // A jukebox pick: plays now if nothing's on, otherwise joins the queue (ahead of station days).
+  const pick = (q: QItem) => {
+    if (itemKey(q) === currentKey && status === 'ready' && audio.ready) return toggle()
+    if (!playing && !loading && !liveBusy) {
+      setJbMsg('')
+      return load(q)
+    }
+    setQueue((old) => {
+      const at = old.findIndex((x) => x.station)
+      const next = at < 0 ? [...old, q] : [...old.slice(0, at), q, ...old.slice(at)]
+      const pos = next.indexOf(q) + 1
+      say(`${itemLabel(q)} added to the queue${pos === 1 ? ', plays next' : `, number ${pos}`}`)
+      return next
+    })
+  }
+  const startStation = (items: QItem[]) => {
+    setQueue(items.slice(1).map((q) => ({ ...q, station: true })))
+    load(items[0])
+  }
+  const next = () => {
+    const [head, ...rest] = queue
+    if (head) {
+      setQueue(rest)
+      return load(head)
+    }
+    if (station) startStation(station.items()) // round again, with fresh dates
+  }
+  const prev = () => {
+    if (time > 3 || !history.current.length) return seek(0)
+    const back = history.current.pop()!
+    if (currentItem) setQueue((old) => [currentItem, ...old])
+    load(back, false)
+  }
+  const onStation = (id: string) => {
+    if (stationId === id) return clearQueue()
+    const s = STATIONS.find((x) => x.id === id)!
+    setStationId(id)
+    say(`Tuned to ${s.title}: ${s.blurb.toLowerCase()}`)
+    startStation(s.items())
+  }
+  const clearQueue = () => {
+    setQueue([])
+    if (stationId) say('Station off')
+    setStationId(null)
+  }
+  const playAll = (items: QItem[], label: string) => {
+    setStationId(null)
+    say(label)
+    setQueue(items.slice(1))
+    load(items[0])
+  }
+
+  // Played to the end: on to the next record (the tour handles its own steps).
+  const ends = audio.ends
+  useEffect(() => {
+    if (ends && tourStep === null) next()
+  }, [ends]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // While one piece plays, fetch and compose the next live day, so there's no wait between them.
+  useEffect(() => {
+    const n = queue[0]
+    if (!playing || !n || n.kind !== 'live') return
+    const layer = LIVE_LAYERS.find((l) => l.id === n.layer)
+    if (!layer) return
+    void getLiveFrames(layer, n.date, n.then)
+      .then((fs) => Promise.all(fs.map((f) => analyzeCached(f, 'adaptive'))))
+      .catch(() => {}) // it'll be tried again (and reported) when its turn comes
+  }, [playing, queue]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // The frame on screen: the one playing, or the first.
   const segIndex = joined ? segmentAt(joined.segments, time) : 0
   const seg = joined?.segments[segIndex] ?? null
   const segTime = seg && time > 0 ? Math.max(time - seg.start, 0.0001) : 0
   const shownFrame = source?.frames[segIndex] ?? source?.frames[0]
+  const nowPlaying: NowPlaying | null = source ? {
+    title,
+    code: track && !track.live ? codeOfTrack(track.id) : null,
+    image: shownFrame?.url ?? null,
+    facts: status === 'error'
+      ? (error ?? 'Something went wrong')
+      : piece ? `${piece.scale} · ${Math.round(piece.bpm)} BPM${series && shownFrame?.label ? ` · ${shownFrame.label}` : ''}` : '',
+    live: !!track?.live,
+    ready: !!ready,
+    loading: loading || (status === 'ready' && audio.rendering),
+  } : null
 
   // Described at normal speed, so the pre-made narration always matches.
   // Worked out once per piece, not on every frame of playback.
@@ -435,30 +568,9 @@ export default function App() {
 
   return (
     <div className="app">
-      <header>
-        <div className="top">
-          <h1>
-            Sonux<span>Box</span>
-          </h1>
-          <ThemePicker />
-        </div>
-        <p className="tagline">Hear NASA's view of Earth.</p>
-        <p>
-          Maps of our planet, played as music: each slice of the image, left to right, becomes a beat. Higher signal
-          plays higher notes, and stronger signal plays louder.
-        </p>
-        {tourStep === null && (
-          <div className="cta">
-            <button className="tour-start" onClick={startTour}>▶ Take the guided tour · 2½ min</button>
-            <a className="cta-alt" href="#live" onClick={(e) => {
-              e.preventDefault()
-              const el = document.getElementById('live')
-              el?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' })
-              document.querySelector<HTMLSelectElement>('.live select')?.focus({ preventScroll: true })
-            }}>or hear this week's Earth, live</a>
-          </div>
-        )}
-      </header>
+      <div className="topbar">
+        <ThemePicker />
+      </div>
 
       {tourStep !== null && (
         <TourBar step={tourStep} total={TOUR.length} phase={tourPhase}
@@ -466,18 +578,30 @@ export default function App() {
           onSkip={nextStep} onStop={stopTour} />
       )}
 
+      <Jukebox now={nowPlaying} playing={playing} time={time} duration={audio.duration} currentKey={currentKey}
+        queue={queue} station={station} stations={STATIONS} message={jbMsg} touring={tourStep !== null}
+        onPick={pick} onToggle={toggle} onNext={next} onPrev={prev} onSeek={seek}
+        onPlayAll={() => playAll(ALL_TRACKS, 'Playing all 12 records')}
+        onShuffle={() => {
+          if (queue.length > 1) {
+            setQueue((q) => shuffled(q))
+            return say('Queue shuffled')
+          }
+          playAll(shuffled(ALL_TRACKS), 'Shuffling all 12 records')
+        }}
+        onRemove={(i) => setQueue((q) => q.filter((_, j) => j !== i))}
+        onPlayNow={(i) => {
+          const q = queue[i]
+          setQueue((old) => old.filter((_, j) => j !== i))
+          load(q)
+        }}
+        onClear={clearQueue} onStation={onStation} onTour={startTour} />
+
       <p className="sr-only" role="status" aria-live="polite">{announce}</p>
 
       <main>
-        <section className="inputs" aria-label="Choose an image">
-          <h2>Earth Jukebox</h2>
-          <Gallery activeId={track?.id ?? null} onPick={(id) => {
-            if (tourStep !== null) stopTour()
-            if (isLoaded({ id })) return toggle()
-            userPlay()
-            void onTrack(id)
-          }} />
-          <h2 id="live">Live from NASA</h2>
+        <section className="inputs" aria-label="More ways to listen">
+          <h2 id="live">Live from NASA, any day</h2>
           <LivePanel busy={liveBusy} error={liveError} onPlay={(l, d, t) => {
             if (tourStep !== null) stopTour()
             if (isLoaded({ live: { layer: l, date: d, then: t } })) return toggle()
@@ -492,13 +616,13 @@ export default function App() {
         <section className={`stage${source ? ' has-source' : ''}`} ref={stageRef} aria-label="Player">
           {!source && (
             <div className="empty">
-              <p>Pick a track to hear it.</p>
+              <p className="eyebrow">Liner notes</p>
+              <p>Every record comes with its story.</p>
               <ul className="sub">
-                <li><b>Earth Jukebox</b>: 12 NASA visualisations, from wildfire smoke to lightning.</li>
-                <li><b>Live from NASA</b>: any day's sea temperature, rain, greenness, heat or haze.</li>
-                <li><b>Your own image</b>: drop in any map or picture.</li>
+                <li>The map, with a needle you can drag to hear one slice at a time.</li>
+                <li>Every note, a sound key, and the data behind it, in plain words.</li>
+                <li>Works with a screen reader, a keyboard, or a finger.</li>
               </ul>
-              <p className="sub">Works with a screen reader, a keyboard, or a finger: every piece is also described in words.</p>
             </div>
           )}
 
@@ -506,6 +630,7 @@ export default function App() {
             <>
               <div className="stage-head">
                 <div>
+                  <p className="eyebrow">Liner notes</p>
                   <h2>{title}</h2>
                   {track && (
                     <a className="source" href={track.source.url} target="_blank" rel="noreferrer">

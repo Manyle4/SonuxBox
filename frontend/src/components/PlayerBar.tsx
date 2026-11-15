@@ -37,11 +37,15 @@ export function PlayerBar({ result, playing, time, duration, onToggle, onDownloa
     setSaving(true)
     try { await onDownload() } finally { setSaving(false) }
   }
+  // Shown when neither this bar nor the jukebox's controls are on screen.
   useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const io = new IntersectionObserver(([e]) => setAway(!e.isIntersecting && e.boundingClientRect.top < 0))
-    io.observe(el)
+    const els = [ref.current, document.querySelector('.jb-transport')].filter((e): e is Element => !!e)
+    const seen = new Map<Element, boolean>()
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) seen.set(e.target, e.isIntersecting)
+      setAway(els.every((el) => seen.get(el) === false))
+    })
+    els.forEach((el) => io.observe(el))
     return () => io.disconnect()
   }, [])
 
