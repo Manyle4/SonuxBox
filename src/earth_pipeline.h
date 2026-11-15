@@ -62,6 +62,14 @@ struct EarthMood {
     std::string scaleName;      // e.g. "D lydian". Empty = just use major/minor.
 };
 
+// A colour layer that got its own instrument (adaptive mode).
+struct LayerInfo {
+    std::string name;  // e.g. "purple"
+    std::string hex;   // e.g. "#b070e0"
+    double share = 0.0;
+    int voice = 4;     // 4 = pluck, 5 = bell
+};
+
 // Everything the pipeline produces, bundled together.
 struct EarthResult {
     EarthAnalysis analysis;
@@ -76,6 +84,7 @@ struct EarthResult {
     double cropBottom = kCropBottom;  // share of the bottom that was ignored
     double cropTop = 0.0;             // share of the top that was ignored (logos)
     std::string analysisMode;   // "terrain" or "adaptive"
+    std::vector<LayerInfo> layers;  // colour layers with their own instrument (adaptive only)
 };
 
 inline bool isActiveData(Terrain t, bool isDarkMap) {
@@ -203,6 +212,8 @@ inline const char* voiceName(int voice) {
         case 1: return "bass";
         case 2: return "pad";
         case 3: return "perc";
+        case 4: return "pluck";
+        case 5: return "bell";
         default: return "melody";
     }
 }
@@ -407,6 +418,14 @@ inline std::string buildJson(const std::string& imageName, const std::string& au
           << (i + 1 < kTerrainCount ? ", " : "");
     }
     f << "},\n";
+
+    f << "  \"layers\": [";
+    for (std::size_t i = 0; i < r.layers.size(); ++i) {
+        const LayerInfo& L = r.layers[i];
+        f << (i ? ", " : "") << "{\"color\": \"" << jsonEscape(L.name) << "\", \"hex\": \"" << L.hex
+          << "\", \"share\": " << L.share << ", \"voice\": \"" << voiceName(L.voice) << "\"}";
+    }
+    f << "],\n";
 
     f << "  \"columnStats\": [\n";
     for (int c = 0; c < kColumns; ++c) {

@@ -34,7 +34,12 @@ inline const Instrument& instrumentFor(int voice) {
     static const Instrument perc   = {0.001, 0.0,  1.0,  0.0,  {0.0, 0.0, 0.0, 0.0, 0.0, 0.0},  1, 0.0, 0.0,   0.22};
     if (voice == 1) return bass;
     if (voice == 2) return pad;
+    //                              att    dec   sus   rel   harmonics                        uni  cents vib    gain
+    static const Instrument pluck  = {0.004, 0.35, 0.0,  0.15, {1.0, 0.6, 0.4, 0.25, 0.15, 0.1}, 1, 0.0, 0.0,   0.20};
+    static const Instrument bell   = {0.002, 1.20, 0.0,  0.60, {1.0, 0.0, 0.45, 0.0, 0.2, 0.0},  1, 0.0, 0.0,   0.14};
     if (voice == 3) return perc;
+    if (voice == 4) return pluck;
+    if (voice == 5) return bell;
     return melody;
 }
 

@@ -48,7 +48,13 @@ inline bool generateMusic(const cv::Mat& image, int sampleRate, AnalysisMode mod
                       << ", signal hue " << traits.signalHueDeg << " deg (colourfulness "
                       << traits.signalSat << "), activity " << traits.activity << "\n";
         }
-        out.notes = composeNotes(out.analysis, profile, verbose);
+        const std::vector<ColourLayer> layers = findLayers(sig);
+        out.layers.clear();
+        for (const ColourLayer& L : layers) out.layers.push_back(L.info);
+        if (verbose) {
+            for (const LayerInfo& L : out.layers) std::cout << "layer: " << L.name << " " << L.hex << " -> " << voiceName(L.voice) << "\n";
+        }
+        out.notes = composeNotes(out.analysis, profile, verbose, layers);
     } else {
         out.analysis = analyzeEarth(image, cropBottom, cropTop);
         out.mood = decideMood(out.analysis.overall);
