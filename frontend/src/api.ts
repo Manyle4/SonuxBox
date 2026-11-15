@@ -16,6 +16,7 @@ export interface Note {
   vel: number // 0..1
   voice: Voice
   pos?: number // 0..1 across its image, for stereo panning (set when frames are joined)
+  pan?: number // -1 left .. +1 right: a fixed side, overriding pos (compare mode)
 }
 
 export interface ColumnStat {

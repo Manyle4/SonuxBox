@@ -137,6 +137,21 @@ function layerSentence(r: AnalyzeResult, info?: TrackInfo) {
   return `Each colour has its own instrument: ${parts.join(', and ')}.`
 }
 
+// Compare mode: two images played together, one per ear, slice by slice.
+export function describeCompare(a: AnalyzeResult, b: AnalyzeResult, titleA: string, titleB: string, infoA?: TrackInfo) {
+  const ia = a.columnStats.map((_, i) => columnInfo(a, i))
+  const ib = b.columnStats.map((_, i) => columnInfo(b, i))
+  const both = ia.map((c, i) => c.strength >= 0.6 && ib[i].strength >= 0.6)
+  const places = [...new Set(both.flatMap((on, i) => (on ? [placeAt(a, i, infoA) ?? across(i, a.columns)] : [])))]
+  const count = both.filter(Boolean).length
+  return [
+    `${titleA} plays in your left ear and ${titleB} in your right, slice by slice at the same pace.`,
+    count === 0
+      ? 'They are rarely strong at the same time, so the two ears mostly take turns.'
+      : `Both are strong together in ${count} of ${a.columns} slices${places.length ? `, around ${places.slice(0, 3).join(', ')}` : ''}: listen for both ears getting loud at once.`,
+  ].join(' ')
+}
+
 // A few sentences describing the whole piece, built from the same numbers that made the music.
 export function describePiece(r: AnalyzeResult, title: string, info?: TrackInfo) {
   const cols = r.columnStats

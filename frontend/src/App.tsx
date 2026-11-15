@@ -10,14 +10,14 @@ import { Mixer } from './components/Mixer'
 import { ModeToggle } from './components/ModeToggle'
 import { PianoRoll } from './components/PianoRoll'
 import { PlayerBar } from './components/PlayerBar'
-import { describePiece, describeSeries } from './describe'
+import { describeCompare, describePiece, describeSeries } from './describe'
 import { setLink } from './link'
 import { narrationKey, narrationText } from './narration'
 import { speak, type Speech } from './speech'
 import { TOUR, tourText } from './tour'
 import { TourBar } from './components/TourBar'
 import { joinFrames, segmentAt } from './series'
-import { framesOf, imageUrl, prerendered, TRACKS, type Track } from './tracks'
+import { framesOf, imageUrl, prerendered, TRACKS, trackUrl, type Track } from './tracks'
 
 interface Frame {
   id: string | null // jukebox image id; null for uploads
@@ -50,13 +50,43 @@ export default function App() {
   const stageRef = useRef<HTMLElement>(null)
 
   // All frames on one timeline, at the chosen speed.
+  // Compare mode: a second single-image track in the other ear.
+  const [compareId, setCompareId] = useState<string | null>(null)
+  const [compareResult, setCompareResult] = useState<AnalyzeResult | null>(null)
+  const compareTrack = TRACKS.find((t) => t.id === compareId) ?? null
+
   const joined = useMemo(() => {
     if (!results || !source || results.length !== source.frames.length) return null
-    return joinFrames(results.map((r, i) => ({ result: atSpeed(r, rate), label: source.frames[i].label, imageUrl: source.frames[i].url })))
-  }, [results, source, rate])
+    const j = joinFrames(results.map((r, i) => ({ result: atSpeed(r, rate), label: source.frames[i].label, imageUrl: source.frames[i].url })))
+    if (!compareResult || results.length !== 1) return j
+    // Stretch the other image to the same pace, so slice i of both plays together.
+    const a = j.segments[0].result
+    const b = atSpeed(compareResult, (rate * compareResult.stepSec) / results[0].stepSec)
+    const left = a.notes.map((n) => ({ ...n, pan: -0.9 }))
+    const right = b.notes.map((n) => ({ ...n, pan: 0.9 }))
+    return {
+      ...j,
+      compare: b,
+      piece: { ...j.piece, notes: [...left, ...right], musicSec: Math.max(a.musicSec, b.musicSec) },
+    }
+  }, [results, source, rate, compareResult])
   const piece = joined?.piece ?? null
   const audio = useAudioEngine(status === 'ready' && piece ? piece.notes : null, 1, muted, reverb)
   const { playing, time, toggle, seek } = audio
+
+  useEffect(() => {
+    setCompareResult(null)
+    if (!compareTrack) return
+    let live = true
+    void (async () => {
+      const r =
+        (await prerendered(compareTrack.id, compareTrack.mode)) ||
+        (await analyze(await (await fetch(trackUrl(compareTrack))).blob(), `${compareTrack.id}.jpg`, compareTrack.mode,
+          compareTrack.crop, undefined, compareTrack.cropTop, compareTrack.scale))
+      if (live) setCompareResult(r)
+    })().catch(() => live && setCompareId(null))
+    return () => { live = false }
+  }, [compareTrack])
 
   // Wake the server while people look around, so their first upload is quick.
   useEffect(() => {
@@ -125,6 +155,7 @@ export default function App() {
     if (!/^image\/(png|jpeg)$/.test(file.type)) return fail('Please pick a PNG or JPEG image.')
     if (file.size > MAX_UPLOAD_BYTES) return fail('That image is over 20 MB. Try a smaller copy.')
     setLink(null, null) // uploads can't be shared by link
+    setCompareId(null)
     const frame = { id: null, blob: file, name: file.name, url: URL.createObjectURL(file), label: '' }
     pickSource({ name: file.name, track: null, frames: [frame] }, mode)
   }
@@ -133,6 +164,7 @@ export default function App() {
     const track = TRACKS.find((t) => t.id === id)
     if (!track) return
     const useMode = m ?? track.mode // each track starts in the mode that suits it
+    if (track.frames || compareId === id) setCompareId(null)
     try {
       const frames = await Promise.all(
         framesOf(track).map(async (f) => {
@@ -141,7 +173,6 @@ export default function App() {
         }),
       )
       setMode(useMode)
-      setLink(id, useMode === track.mode ? null : useMode)
       pickSource({ name: track.title, track, frames }, useMode)
     } catch {
       fail('Could not load that track.')
@@ -151,7 +182,6 @@ export default function App() {
   // Changing mode re-runs the current image.
   const onMode = (m: AnalysisMode) => {
     setMode(m)
-    if (source?.track) setLink(source.track.id, m === source.track.mode ? null : m)
     if (source) void run(source, m)
   }
 
@@ -164,7 +194,10 @@ export default function App() {
     const id = q.get('track')
     const m = q.get('mode')
     if (id) void onTrack(id, m === 'adaptive' || m === 'terrain' ? m : undefined)
-  })
+    const other = q.get('compare')
+    if (id && other && other !== id) setCompareId(other)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Space bar plays/pauses, unless you're on a control that already uses it.
   useEffect(() => {
@@ -236,6 +269,11 @@ export default function App() {
     wasPlaying.current = playing
   }, [playing, time, tourStep, tourPhase, nextStep])
 
+  // The address bar follows the open track, its mode and any comparison, so it can be shared.
+  useEffect(() => {
+    if (source?.track) setLink(source.track.id, mode === source.track.mode ? null : mode, compareId)
+  }, [source, mode, compareId])
+
   const loading = status === 'loading'
   const track = source?.track ?? null
   const title = track?.title ?? source?.name ?? ''
@@ -256,7 +294,12 @@ export default function App() {
     : series
       ? describeSeries(results.map((r, i) => ({ result: r, label: source.frames[i].label })), title)
       : describePiece(results[0], title, info)
-  const spoken = results && source ? narrationText(track, title, results, source.frames.map((f) => f.label)) : ''
+  const compareText = joined && 'compare' in joined && joined.compare && compareTrack
+    ? describeCompare(joined.segments[0].result, joined.compare, title, compareTrack.title, info)
+    : ''
+  const spoken = results && source
+    ? [narrationText(track, title, results, source.frames.map((f) => f.label)), compareText].filter(Boolean).join(' ')
+    : ''
 
   const toggleLayer = (v: Voice) =>
     setMuted((old) => {
@@ -347,6 +390,8 @@ export default function App() {
                 </div>
               )}
 
+              <div className={compareTrack && joined && 'compare' in joined ? 'compare-maps' : ''}>
+              {compareTrack && <p className="ear">Left ear · {title}</p>}
               <MapView
                 imageUrl={shownFrame.url}
                 imageAlt={track ? `${track.title}${shownFrame.label ? `, ${shownFrame.label}` : ''}. ${track.about}` : `Your image, ${source.name}`}
@@ -357,6 +402,14 @@ export default function App() {
                 onSeek={(t) => seek((seg?.start ?? 0) + t)}
                 info={info}
               />
+              {compareTrack && joined && 'compare' in joined && joined.compare && (
+                <>
+                  <p className="ear">Right ear · {compareTrack.title}</p>
+                  <MapView imageUrl={trackUrl(compareTrack)} imageAlt={`${compareTrack.title} map. ${compareTrack.about}`}
+                    result={joined.compare} time={segTime} playing={playing} onSeek={seek} info={compareTrack} />
+                </>
+              )}
+              </div>
 
               {ready && piece && seg && (
                 <>
@@ -366,6 +419,20 @@ export default function App() {
                     reverb={reverb} onReverb={() => setReverb((r) => !r)}
                     hasPerc={piece.notes.some((n) => n.voice === 'perc')}
                     layers={(seg.result.layers ?? []).filter((l) => piece.notes.some((n) => n.voice === l.voice))} info={info} />
+                  {track && !series && (
+                    <label className="compare-pick">
+                      Compare with
+                      <select value={compareId ?? ''} onChange={(e) => {
+                        const v = e.target.value || null
+                        setCompareId(v)
+                      }}>
+                        <option value="">nothing (one image)</option>
+                        {TRACKS.filter((t) => !t.frames && t.id !== track.id).map((t) => (
+                          <option key={t.id} value={t.id}>{t.title}{t.geo && track.geo ? ' · same map' : ''}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                   <Caption result={seg.result} time={segTime} playing={playing} info={info} />
                   <PianoRoll result={piece} time={time} onSeek={seek} muted={muted} info={info}
                     marks={series ? joined.segments.map((s) => ({ at: s.start, label: s.label })) : []} />
@@ -377,6 +444,7 @@ export default function App() {
                     </div>
                     {track && <p className="about">{track.about} {track.listen}</p>}
                     <p>{description}</p>
+                    {compareText && <p className="compare-text">{compareText}</p>}
                     <details>
                       <summary>How the image becomes music</summary>
                       <ul>

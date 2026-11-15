@@ -213,3 +213,13 @@ footer a { color: var(--muted); }
 /* ---- colour layers ---- */
 .mixer .layer.pluck::before, .mixer .layer.bell::before { background: var(--swatch, var(--muted)); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35); }
 .key.layerkey::before { background: var(--swatch); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55); }
+
+/* ---- compare mode ---- */
+.compare-maps { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+.compare-maps .ear:nth-of-type(1) { grid-column: 1; grid-row: 1; }
+.compare-maps .ear:nth-of-type(2) { grid-column: 2; grid-row: 1; }
+.ear { margin: 0; font-size: 0.8rem; color: var(--muted); }
+.compare-pick { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 0.85rem; color: var(--muted); }
+.compare-pick select { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; }
+.compare-text { color: var(--accent) !important; }
+@media (max-width: 520px) { .compare-maps { grid-template-columns: 1fr; } .compare-maps .ear { grid-column: auto !important; grid-row: auto !important; } }

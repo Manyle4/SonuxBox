@@ -71,7 +71,7 @@ export function renderStems(notes: Note[], sampleRate: number, gridSec: number):
     // Equal-power pan from where the note starts across the image (-1 left .. +1 right).
     const across = n.pos ?? (gridSec > 0 ? n.start / gridSec : 0.5) // gridSec 0 = no panning
     const pos = Math.min(Math.max(across, 0), 1) * 2 - 1
-    const angle = ((pos * PAN_WIDTH[n.voice] + 1) * Math.PI) / 4
+    const angle = (((n.pan ?? pos * PAN_WIDTH[n.voice]) + 1) * Math.PI) / 4
     const gl = Math.cos(angle)
     const gr = Math.sin(angle)
     const first = Math.floor(n.start * sampleRate)
