@@ -8,7 +8,14 @@
     "source": {
       "label": "NASA GMAO / SVS: Air Quality Model Runs",
       "url": "https://svs.gsfc.nasa.gov/5533/"
-    }
+    },
+    "geo": {
+      "west": -180,
+      "east": 180,
+      "north": 90,
+      "south": -90
+    },
+    "cropTop": 0.08
   },
   {
     "id": "o3",
@@ -19,7 +26,14 @@
     "source": {
       "label": "NASA GMAO / SVS: Air Quality Model Runs",
       "url": "https://svs.gsfc.nasa.gov/5533/"
-    }
+    },
+    "geo": {
+      "west": -180,
+      "east": 180,
+      "north": 90,
+      "south": -90
+    },
+    "cropTop": 0.08
   },
   {
     "id": "nox",
@@ -30,7 +44,14 @@
     "source": {
       "label": "NASA GMAO / SVS: Air Quality Model Runs",
       "url": "https://svs.gsfc.nasa.gov/5533/"
-    }
+    },
+    "geo": {
+      "west": -180,
+      "east": 180,
+      "north": 90,
+      "south": -90
+    },
+    "cropTop": 0.08
   },
   {
     "id": "aerosol",
@@ -41,7 +62,31 @@
     "source": {
       "label": "NASA SVS: GEOS Aerosols",
       "url": "https://svs.gsfc.nasa.gov/5669/"
-    }
+    },
+    "geo": {
+      "west": -180,
+      "east": 180,
+      "north": 90,
+      "south": -90
+    },
+    "categories": [
+      {
+        "hex": "#d25e45",
+        "name": "black carbon"
+      },
+      {
+        "hex": "#c19adc",
+        "name": "dust"
+      },
+      {
+        "hex": "#85aaa9",
+        "name": "sea salt"
+      },
+      {
+        "hex": "#53dc34",
+        "name": "sulfate"
+      }
+    ]
   },
   {
     "id": "current",
@@ -52,6 +97,17 @@
     "source": {
       "label": "NASA SVS: Global Sea Surface Currents and Temperature",
       "url": "https://svs.gsfc.nasa.gov/3912/"
+    },
+    "geo": {
+      "west": -180,
+      "east": 180,
+      "north": 90,
+      "south": -90
+    },
+    "scale": "#345ff8:0.3;#3373ea:1.6;#3287db:2.9;#329acc:4.1;#32acbd:5.4;#33beae:6.6;#35ce9f:7.9;#36de91:9.1;#38ec83:10.4;#3af975:11.7;#3cff67:12.9;#3fff5a:14.2;#48ff4c:15.4;#5eff3f:16.7;#7cff33:17.9;#a0ff2a:19.2;#c2ff24:20.5;#e2ff22:21.7;#f9ff21:23.0;#fbef20:24.2;#fad11e:25.5;#f9ac1c:26.7;#f8811b:28.0;#f75419:29.3;#f71a19:30.5;#f70018:31.7",
+    "measure": {
+      "label": "sea temperature",
+      "unit": "°C"
     }
   },
   {
@@ -121,6 +177,12 @@
     "source": {
       "label": "NASA SVS: Lightning Events Detected from the ISS",
       "url": "https://svs.gsfc.nasa.gov/5011/"
+    },
+    "geo": {
+      "west": -180,
+      "east": 180,
+      "north": 90,
+      "south": -90
     }
   },
   {

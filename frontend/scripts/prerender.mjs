@@ -9,7 +9,7 @@ const out = new URL('../public/tracks/', import.meta.url)
 await mkdir(out, { recursive: true })
 
 // A time-lapse track has several frames; each gets its own result.
-const jobs = tracks.flatMap((t) => (t.frames ?? [{ id: t.id }]).map((f) => ({ id: f.id, crop: t.crop })))
+const jobs = tracks.flatMap((t) => (t.frames ?? [{ id: t.id }]).map((f) => ({ id: f.id, crop: t.crop, cropTop: t.cropTop, scale: t.scale })))
 
 for (const t of jobs) {
   for (const mode of ['adaptive', 'terrain']) {
@@ -18,6 +18,8 @@ for (const t of jobs) {
     form.append('image', new Blob([bytes], { type: 'image/jpeg' }), `${t.id}.jpg`)
     form.append('mode', mode)
     if (t.crop !== undefined) form.append('crop', String(t.crop))
+    if (t.cropTop !== undefined) form.append('cropTop', String(t.cropTop))
+    if (t.scale) form.append('scale', t.scale)
 
     const res = await fetch(`${API}/api/analyze`, { method: 'POST', body: form })
     const body = await res.json()

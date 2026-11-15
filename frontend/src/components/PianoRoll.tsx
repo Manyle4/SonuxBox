@@ -1,5 +1,8 @@
 import type { MouseEvent } from 'react'
 import type { AnalyzeResult, Voice } from '../api'
+import { layerName, type TrackInfo } from '../describe'
+
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1)
 
 interface Props {
   result: AnalyzeResult
@@ -7,12 +10,13 @@ interface Props {
   onSeek: (sec: number) => void
   muted?: Set<Voice>
   marks?: { at: number; label: string }[] // frame starts in a time-lapse
+  info?: TrackInfo
 }
 
 const W = 1000
 const H = 220
 
-export function PianoRoll({ result, time, onSeek, muted, marks = [] }: Props) {
+export function PianoRoll({ result, time, onSeek, muted, marks = [], info }: Props) {
   const total = Math.max(result.musicSec, result.columns * result.stepSec)
   const pitched = result.notes.filter((n) => n.voice !== 'perc')
   const hits = result.notes.filter((n) => n.voice === 'perc')
@@ -24,8 +28,10 @@ export function PianoRoll({ result, time, onSeek, muted, marks = [] }: Props) {
   const x = (sec: number) => (sec / total) * W
 
   // Draw pad first and melody last, so the melody sits on top.
-  const order = { pad: 0, bass: 1, melody: 2 }
-  const notes = [...pitched].sort((a, b) => order[a.voice as 'pad' | 'bass' | 'melody'] - order[b.voice as 'pad' | 'bass' | 'melody'])
+  const order: Record<string, number> = { pad: 0, bass: 1, pluck: 2, bell: 3, melody: 4 }
+  const notes = [...pitched].sort((a, b) => order[a.voice] - order[b.voice])
+  // Colour layers draw in their own colour.
+  const layerFill = Object.fromEntries((result.layers ?? []).map((l) => [l.voice, l.hex]))
 
   const seekFromClick = (e: MouseEvent<SVGSVGElement>) => {
     const box = e.currentTarget.getBoundingClientRect()
@@ -52,6 +58,8 @@ export function PianoRoll({ result, time, onSeek, muted, marks = [] }: Props) {
               height={Math.max(rowH - 2, 2)}
               rx={2}
               opacity={0.35 + 0.65 * n.vel}
+              style={layerFill[n.voice] && !active ? { fill: layerFill[n.voice] } : undefined}
+              {...(layerFill[n.voice] && { stroke: 'rgba(255,255,255,0.55)', strokeWidth: 1, vectorEffect: 'non-scaling-stroke' })}
             />
           )
         })}
@@ -79,6 +87,11 @@ export function PianoRoll({ result, time, onSeek, muted, marks = [] }: Props) {
         <span className="key bass">Bass</span>
         <span className="key pad">Pad</span>
         {hits.length > 0 && <span className="key perc">Drums</span>}
+        {(result.layers ?? []).filter((l) => result.notes.some((n) => n.voice === l.voice)).map((l) => (
+          <span key={l.voice} className="key layerkey" style={{ '--swatch': l.hex } as React.CSSProperties}>
+            {cap(layerName(l, info))} ({l.voice})
+          </span>
+        ))}
       </figcaption>
     </figure>
   )

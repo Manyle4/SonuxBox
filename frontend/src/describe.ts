@@ -1,4 +1,12 @@
-import type { AnalyzeResult, Note } from './api'
+import type { AnalyzeResult, Layer, Note } from './api'
+import { placeOf, type Geo } from './geo'
+
+// What a track knows about its image, beyond the pixels.
+export interface TrackInfo {
+  geo?: Geo // map edges, for naming places
+  measure?: { label: string; unit: string } // what the colour scale measures
+  categories?: { hex: string; name: string }[] // named colours from the image's legend
+}
 
 const NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
 
@@ -42,17 +50,110 @@ export function columnInfo(r: AnalyzeResult, col: number): ColumnInfo {
   return { strength, rest: !melody, melody, bass: at('bass') }
 }
 
-// Short line for the explore slider, read out by screen readers.
-export function describeColumn(r: AnalyzeResult, col: number) {
-  const info = columnInfo(r, col)
-  const word = info.rest ? 'little' : info.strength >= 0.7 ? 'strong' : 'some'
-  const base = `Column ${col + 1} of ${r.columns}: ${word} signal`
-  if (!info.melody) return `${base}, rest`
-  return `${base}, ${height(r.columnStats[col].landPos)}, note ${noteName(info.melody.midi)}`
+// Region name for a slice, or null when the image isn't a known world map.
+export const placeAt = (r: AnalyzeResult, col: number, info?: TrackInfo) =>
+  info?.geo ? placeOf(info.geo, col, r.columns, r.columnStats[col].peakPos ?? r.columnStats[col].landPos, r.cropBottom, r.cropTop) : null
+
+// Short line for the explore slider and live captions, read out by screen readers.
+export function describeColumn(r: AnalyzeResult, col: number, info?: TrackInfo) {
+  const c = columnInfo(r, col)
+  const word = c.rest ? 'little' : c.strength >= 0.7 ? 'strong' : 'some'
+  const place = placeAt(r, col, info)
+  const reading = valueAt(r, col, info)
+  const base = `${place ? `${cap(place)}, slice` : 'Slice'} ${col + 1} of ${r.columns}: ${word} signal`
+  const tail = reading ? `, ${info!.measure!.label} ${reading}` : ''
+  if (!c.melody) return `${base}, rest${tail}`
+  return `${base}, ${height(r.columnStats[col].landPos)}, note ${noteName(c.melody.midi)}${tail}`
+}
+
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1)
+
+// The 2-3 regions with the most signal in a stretch of slices, in left-to-right order.
+function mainPlaces(r: AnalyzeResult, infos: ColumnInfo[], from: number, to: number, info: TrackInfo) {
+  const score = new Map<string, { total: number; first: number }>()
+  for (let c = from; c <= to; c++) {
+    const p = placeAt(r, c, info)!
+    const e = score.get(p) ?? { total: 0, first: c }
+    e.total += infos[c].strength
+    score.set(p, e)
+  }
+  const top = [...score.entries()].sort((a, b) => b[1].total - a[1].total).slice(0, 3)
+  const names = top.sort((a, b) => a[1].first - b[1].first).map(([p]) => p)
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]
+}
+
+// One line on where the signal peaks, for the tour.
+export function strongestSentence(r: AnalyzeResult, info?: TrackInfo) {
+  const infos = r.columnStats.map((_, i) => columnInfo(r, i))
+  const peak = infos.reduce((top, c, i) => (c.strength > infos[top].strength ? i : top), 0)
+  const p = placeAt(r, peak, info)
+  return `Listen for the loudest moment, about ${secs(peak * r.stepSec)} in: that's ${p ? `over ${p}` : `${across(peak, r.columns)} of the image`}, where the signal is strongest.`
+}
+
+// A reading off the image's colour scale, e.g. "about 24 °C".
+export function valueAt(r: AnalyzeResult, col: number, info?: TrackInfo) {
+  const v = r.columnStats[col].value
+  return info?.measure && v != null ? `about ${Math.round(v)} ${info.measure.unit}` : null
+}
+
+// Coolest and warmest (or lowest and highest) readings across the image.
+function rangeSentence(r: AnalyzeResult, info: TrackInfo | undefined, where: (col: number) => string) {
+  if (!info?.measure) return ''
+  const cols = r.columnStats.map((c, i) => ({ v: c.value, i })).filter((c): c is { v: number; i: number } => c.v != null)
+  if (cols.length < 2) return ''
+  const lo = cols.reduce((a, b) => (b.v < a.v ? b : a))
+  const hi = cols.reduce((a, b) => (b.v > a.v ? b : a))
+  const u = info.measure.unit
+  return `${cap(info.measure.label)} runs from about ${Math.round(lo.v)} ${u} ${where(lo.i)} to about ${Math.round(hi.v)} ${u} ${where(hi.i)}.`
+}
+
+// A layer's name: the legend's word for its colour when the image has one (e.g. "dust").
+// Matched by hue, since a layer's average colour is often a darker, greyer shade of the swatch.
+export function layerName(l: Layer, info?: TrackInfo) {
+  const hsv = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min
+    let h = 0
+    if (d > 0) h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+    return { h: (h * 60 + 360) % 360, s: max ? d / max : 0 }
+  }
+  const mine = hsv(l.hex)
+  if (mine.s < 0.1) return l.color
+  let best: { name: string; d: number } | null = null
+  for (const c of info?.categories ?? []) {
+    const theirs = hsv(c.hex)
+    const gap = Math.abs(mine.h - theirs.h)
+    const d = Math.min(gap, 360 - gap)
+    if (d < 35 && (!best || d < best.d)) best = { name: c.name, d }
+  }
+  return best ? best.name : l.color
+}
+
+// Which colours got their own instrument (only those that actually play).
+function layerSentence(r: AnalyzeResult, info?: TrackInfo) {
+  const playing = (r.layers ?? []).filter((l) => r.notes.some((n) => n.voice === l.voice))
+  if (!playing.length) return ''
+  const parts = playing.map((l) => `the ${layerName(l, info)} areas play ${l.voice === 'bell' ? 'bells' : 'a soft pluck'}`)
+  return `Each colour has its own instrument: ${parts.join(', and ')}.`
+}
+
+// Compare mode: two images played together, one per ear, slice by slice.
+export function describeCompare(a: AnalyzeResult, b: AnalyzeResult, titleA: string, titleB: string, infoA?: TrackInfo) {
+  const ia = a.columnStats.map((_, i) => columnInfo(a, i))
+  const ib = b.columnStats.map((_, i) => columnInfo(b, i))
+  const both = ia.map((c, i) => c.strength >= 0.6 && ib[i].strength >= 0.6)
+  const places = [...new Set(both.flatMap((on, i) => (on ? [placeAt(a, i, infoA) ?? across(i, a.columns)] : [])))]
+  const count = both.filter(Boolean).length
+  return [
+    `${titleA} plays in your left ear and ${titleB} in your right, slice by slice at the same pace.`,
+    count === 0
+      ? 'They are rarely strong at the same time, so the two ears mostly take turns.'
+      : `Both are strong together in ${count} of ${a.columns} slices${places.length ? `, around ${places.slice(0, 3).join(', ')}` : ''}: listen for both ears getting loud at once.`,
+  ].join(' ')
 }
 
 // A few sentences describing the whole piece, built from the same numbers that made the music.
-export function describePiece(r: AnalyzeResult, title: string) {
+export function describePiece(r: AnalyzeResult, title: string, info?: TrackInfo) {
   const cols = r.columnStats
   const infos = cols.map((_, i) => columnInfo(r, i))
   const restCount = infos.filter((c) => c.rest).length
@@ -75,16 +176,23 @@ export function describePiece(r: AnalyzeResult, title: string) {
   const highest = melody.reduce<Note | null>((top, n) => (!top || n.midi > top.midi ? n : top), null)
   const highCol = highest ? Math.min(Math.floor(highest.start / r.stepSec), r.columns - 1) : peak
 
+  // With a world map, say where; otherwise say where across the image.
+  const where = (col: number) => {
+    const p = placeAt(r, col, info)
+    return p ? `over ${p}` : `at ${across(col, r.columns)}`
+  }
   const sentences = [
-    `${title}, played as a ${secs(r.musicSec)} piece in ${r.scale} at ${Math.round(r.bpm)} beats per minute.`,
+    `${title} plays for about ${secs(r.musicSec)}, in ${r.scale} at ${Math.round(r.bpm)} beats per minute.`,
     'The image is read from left to right, one slice per beat.',
     best.to >= best.from
-      ? `The melody is busiest from ${across(best.from, r.columns)} to ${across(best.to, r.columns)} of the image ` +
+      ? (info?.geo
+          ? `The melody is busiest over ${mainPlaces(r, infos, best.from, best.to, info)} `
+          : `The melody is busiest from ${across(best.from, r.columns)} to ${across(best.to, r.columns)} of the image `) +
         `(about ${secs(best.from * r.stepSec)} to ${secs((best.to + 1) * r.stepSec)} in).`
       : 'The image has very little signal, so the melody is sparse.',
-    `The strongest signal is at ${across(peak, r.columns)}, around ${secs(peak * r.stepSec)} in, where the melody is loudest.`,
+    `The strongest signal is ${where(peak)}, around ${secs(peak * r.stepSec)} in, where the melody is loudest.`,
     highest
-      ? `Its highest note, ${noteName(highest.midi)}, comes at ${across(highCol, r.columns)}, where the signal sits ${height(cols[highCol].landPos)} of the image.`
+      ? `Its highest note, ${noteName(highest.midi)}, comes ${where(highCol)}, where the signal sits ${height(cols[highCol].landPos)} of the image.`
       : '',
     restCount > 0
       ? `About ${Math.round((restCount / r.columns) * 100)}% of the slices are quiet enough that the melody rests.`
@@ -93,6 +201,8 @@ export function describePiece(r: AnalyzeResult, title: string) {
     hits > 0
       ? `${hits} drum ${hits === 1 ? 'hit marks' : 'hits mark'} places where the signal jumps up suddenly.`
       : '',
+    rangeSentence(r, info, where),
+    layerSentence(r, info),
   ]
   return sentences.filter(Boolean).join(' ')
 }

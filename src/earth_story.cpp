@@ -10,7 +10,7 @@
 int main(int argc, char** argv) {
     // Separate the --adaptive flag from the normal arguments, wherever it appears.
     AnalysisMode mode = AnalysisMode::Terrain;
-    double crop = kCropBottom;
+    double crop = kCropBottom, cropTop = 0.0;
     std::vector<std::string> args;
     for (int i = 1; i < argc; ++i) {
         const std::string a = argv[i];
@@ -18,12 +18,14 @@ int main(int argc, char** argv) {
             mode = AnalysisMode::Adaptive;
         } else if (a.rfind("--crop=", 0) == 0) {
             crop = std::stod(a.substr(7));  // share of the bottom to ignore, 0..0.3
+        } else if (a.rfind("--crop-top=", 0) == 0) {
+            cropTop = std::stod(a.substr(11));  // share of the top to ignore (logos)
         } else {
             args.push_back(a);
         }
     }
     if (args.empty()) {
-        std::cerr << "Usage: " << argv[0] << " <image> [output.wav] [--adaptive] [--crop=0..0.3]\n";
+        std::cerr << "Usage: " << argv[0] << " <image> [output.wav] [--adaptive] [--crop=0..0.3] [--crop-top=0..0.3]\n";
         return 1;
     }
     const std::string inPath = args[0];
@@ -43,7 +45,7 @@ int main(int argc, char** argv) {
 
     EarthResult result;
     std::string error;
-    if (!generateMusic(image, 44100, mode, result, error, /*verbose=*/true, crop)) {
+    if (!generateMusic(image, 44100, mode, result, error, /*verbose=*/true, crop, cropTop)) {
         std::cerr << "Failed: " << error << "\n";
         return 1;
     }

@@ -7,7 +7,7 @@ export const API_URL = (
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 
 export type AnalysisMode = 'adaptive' | 'terrain'
-export type Voice = 'melody' | 'bass' | 'pad' | 'perc'
+export type Voice = 'melody' | 'bass' | 'pad' | 'perc' | 'pluck' | 'bell'
 
 export interface Note {
   start: number // seconds
@@ -16,12 +16,22 @@ export interface Note {
   vel: number // 0..1
   voice: Voice
   pos?: number // 0..1 across its image, for stereo panning (set when frames are joined)
+  pan?: number // -1 left .. +1 right: a fixed side, overriding pos (compare mode)
 }
 
 export interface ColumnStat {
   land: number // signal strength in adaptive mode
   ocean: number // quiet share in adaptive mode
   landPos: number // 0 = bottom, 1 = top
+  peakPos?: number // height of the strongest band (newer engine only)
+  value?: number // reading off the image's colour scale, when one was given
+}
+
+export interface Layer {
+  color: string // e.g. "purple"
+  hex: string
+  share: number // of the signal
+  voice: 'pluck' | 'bell'
 }
 
 export interface AnalyzeResult {
@@ -34,12 +44,14 @@ export interface AnalyzeResult {
   imageWidth: number
   imageHeight: number
   cropBottom: number // bottom share of the image the engine ignores (legends)
+  cropTop?: number // top share it ignores (logos); newer engine only
   columns: number
   stepSec: number
   musicSec: number // last note lets go here
   durationSec: number // includes the fade-out tail
   share: Record<string, number>
   columnStats: ColumnStat[]
+  layers?: Layer[] // colour layers with their own instrument (adaptive mode, newer engine)
   notes: Note[]
 }
 
@@ -53,11 +65,15 @@ async function readError(res: Response): Promise<string> {
   return `Server error (${res.status})`
 }
 
-export async function analyze(file: Blob, name: string, mode: AnalysisMode, crop?: number, signal?: AbortSignal) {
+export async function analyze(
+  file: Blob, name: string, mode: AnalysisMode, crop?: number, signal?: AbortSignal, cropTop?: number, scale?: string,
+) {
   const form = new FormData()
   form.append('image', file, name)
   form.append('mode', mode)
   if (crop !== undefined) form.append('crop', String(crop))
+  if (cropTop !== undefined) form.append('cropTop', String(cropTop))
+  if (scale) form.append('scale', scale)
 
   const res = await fetch(`${API_URL}/api/analyze`, { method: 'POST', body: form, signal })
   if (!res.ok) throw new Error(await readError(res))

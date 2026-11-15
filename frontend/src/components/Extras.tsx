@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { speak, type Speech } from '../speech'
 
 export function CopyLink() {
   const [copied, setCopied] = useState(false)
@@ -18,27 +19,24 @@ export function CopyLink() {
   )
 }
 
-// Reads the description out with the browser's own voice, for people without a screen reader.
-export function ReadAloud({ text }: { text: string }) {
+// Reads the description out (recorded voice when available).
+export function ReadAloud({ text, recording }: { text: string; recording?: string }) {
   const [speaking, setSpeaking] = useState(false)
-  const supported = typeof window !== 'undefined' && 'speechSynthesis' in window
+  const speechRef = useRef<Speech | null>(null)
 
-  useEffect(() => () => { if (supported) speechSynthesis.cancel() }, [supported, text])
+  useEffect(() => () => speechRef.current?.stop(), [text]) // new piece: stop talking about the old one
 
-  if (!supported) return null
   const toggle = () => {
     if (speaking) {
-      speechSynthesis.cancel()
-      setSpeaking(false)
+      speechRef.current?.stop()
       return
     }
-    const u = new SpeechSynthesisUtterance(text)
-    u.onend = () => setSpeaking(false)
-    u.onerror = () => setSpeaking(false)
-    speechSynthesis.cancel()
-    speechSynthesis.speak(u)
+    const sp = speak(text, recording)
+    speechRef.current = sp
     setSpeaking(true)
+    void sp.done.then(() => setSpeaking(false))
   }
+
   return (
     <button className="linkbtn" onClick={toggle} aria-pressed={speaking}>
       {speaking ? 'Stop reading' : 'Read aloud'}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Note, Voice } from '../api'
 import { VOICES, type Stem } from './synth'
 import type { RenderRequest } from './synth.worker'
+import { addReverb, REVERB_WET } from './reverb'
 import { encodeWav } from './wav'
 
 const SAMPLE_RATE = 44100
@@ -14,7 +15,7 @@ interface Rendered {
 
 // Renders notes in a worker, then plays the four layers through Web Audio so they can be
 // muted live. Reports the playhead time every frame while playing.
-export function useAudioEngine(notes: Note[] | null, gridSec: number, muted: Set<Voice>) {
+export function useAudioEngine(notes: Note[] | null, gridSec: number, muted: Set<Voice>, reverb = true) {
   const [rendered, setRendered] = useState<Rendered | null>(null)
   const [rendering, setRendering] = useState(false)
   const [playing, setPlaying] = useState(false)
@@ -26,6 +27,8 @@ export function useAudioEngine(notes: Note[] | null, gridSec: number, muted: Set
   const buffersRef = useRef<Record<Voice, AudioBuffer> | null>(null)
   const gainsRef = useRef<Record<Voice, GainNode> | null>(null)
   const masterRef = useRef<GainNode | null>(null)
+  const wetRef = useRef<GainNode | null>(null)
+  const reverbRef = useRef(reverb)
   const sourcesRef = useRef<AudioBufferSourceNode[]>([])
   const startedAt = useRef(0) // context time when playback (re)started
   const offsetRef = useRef(0) // where in the piece it (re)started
@@ -39,7 +42,9 @@ export function useAudioEngine(notes: Note[] | null, gridSec: number, muted: Set
     if (!ctxRef.current) {
       const c = new AudioContext({ sampleRate: SAMPLE_RATE })
       const master = c.createGain()
-      master.connect(c.destination)
+      const room = addReverb(c, c.destination, reverbRef.current)
+      master.connect(room.input)
+      wetRef.current = room.wet
       const gains = {} as Record<Voice, GainNode>
       for (const v of VOICES) {
         gains[v] = c.createGain()
@@ -145,6 +150,13 @@ export function useAudioEngine(notes: Note[] | null, gridSec: number, muted: Set
     if (sameImage) startAt(next)
   }, [rendered, startAt])
 
+  // Reverb on/off, live.
+  useEffect(() => {
+    reverbRef.current = reverb
+    const c = ctxRef.current
+    if (c && wetRef.current) wetRef.current.gain.setTargetAtTime(reverb ? REVERB_WET : 0, c.currentTime, 0.05)
+  }, [reverb])
+
   // Mutes apply instantly (short ramp so it doesn't click).
   useEffect(() => {
     mutedRef.current = muted
@@ -199,22 +211,30 @@ export function useAudioEngine(notes: Note[] | null, gridSec: number, muted: Set
     startAt(t)
   }, [duration, startAt])
 
-  // What you hear, as a WAV: unmuted layers mixed at the same loudness.
-  const exportWav = useCallback(() => {
+  // What you hear, as a WAV: unmuted layers at the same loudness, through the same room.
+  const exportWav = useCallback(async () => {
     if (!rendered) return null
-    const g = rendered.peak > 0 ? 0.9 / rendered.peak : 1
-    const left = new Float32Array(rendered.length)
-    const right = new Float32Array(rendered.length)
+    const tail = reverbRef.current ? Math.floor(2.4 * SAMPLE_RATE) : 0
+    const off = new OfflineAudioContext(2, rendered.length + tail, SAMPLE_RATE)
+    const master = off.createGain()
+    master.gain.value = rendered.peak > 0 ? 0.9 / rendered.peak : 1
+    master.connect(addReverb(off, off.destination, reverbRef.current).input)
     for (const v of VOICES) {
       if (mutedRef.current.has(v)) continue
-      const s = rendered.stems[v]
-      for (let i = 0; i < rendered.length; i++) {
-        left[i] += s.left[i] * g
-        right[i] += s.right[i] * g
-      }
+      const b = off.createBuffer(2, rendered.length, SAMPLE_RATE)
+      b.copyToChannel(rendered.stems[v].left as Float32Array<ArrayBuffer>, 0)
+      b.copyToChannel(rendered.stems[v].right as Float32Array<ArrayBuffer>, 1)
+      const src = off.createBufferSource()
+      src.buffer = b
+      src.connect(master)
+      src.start()
     }
-    return encodeWav(left, right, SAMPLE_RATE)
+    const mix = await off.startRendering()
+    return encodeWav(mix.getChannelData(0), mix.getChannelData(1), SAMPLE_RATE)
   }, [rendered])
 
-  return { ready: !!rendered && !rendering, rendering, playing, time, duration, toggle, seek, exportWav }
+  // Call from a click, so later (async) playback is allowed to make sound.
+  const unlock = useCallback(() => void ctx().resume(), [])
+
+  return { ready: !!rendered && !rendering, rendering, playing, time, duration, toggle, seek, exportWav, unlock }
 }

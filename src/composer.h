@@ -126,8 +126,33 @@ inline std::array<int, 4> chordProgression(ScaleType s) {
 }
 
 // ---- The composer: melody that follows the signal, plus a bass ----
+// Each colour layer plays its own line where that colour is strong: a pluck an octave
+// below the melody off the beat, and bells an octave above on it.
+inline void addLayerNotes(std::vector<NoteEvent>& notes, const std::vector<ColourLayer>& layers,
+                          const MusicProfile& p, double stepSec) {
+    const int degrees = scaleInfo(p.scale).size;  // one octave of the scale
+    for (const ColourLayer& L : layers) {
+        const double maxS = *std::max_element(L.strength.begin(), L.strength.end());
+        if (maxS <= 0.0) continue;
+        const bool bell = L.info.voice == 5;
+        for (int c = 0; c < static_cast<int>(L.strength.size()); ++c) {
+            const double rel = L.strength[c] / maxS;
+            if (rel < 0.5) continue;
+            if (c % 2 != (bell ? 0 : 1)) continue;  // bells on the beat, plucks off it
+            const int degree = static_cast<int>(std::lround(std::clamp(L.pos[c], 0.0, 1.0) * degrees));
+            NoteEvent n;
+            n.startSec = c * stepSec;
+            n.durationSec = (bell ? 2.0 : 0.8) * stepSec;
+            n.midiNote = scaleNote(p.melodyBase + (bell ? 12 : -12), degree, p.scale);
+            n.velocity = static_cast<float>((bell ? 0.25 : 0.3) + 0.35 * rel);
+            n.voice = L.info.voice;
+            notes.push_back(n);
+        }
+    }
+}
+
 inline std::vector<NoteEvent> composeNotes(const EarthAnalysis& analysis, const MusicProfile& p,
-                                           bool verbose) {
+                                           bool verbose, const std::vector<ColourLayer>& layers = {}) {
     const double stepSec = 60.0 / p.bpm / 2.0;  // eighth notes
     const std::vector<ColumnStats>& cols = analysis.columns;
     std::vector<NoteEvent> notes;
@@ -240,6 +265,7 @@ inline std::vector<NoteEvent> composeNotes(const EarthAnalysis& analysis, const 
     }
 
     addPercussion(notes, cols, stepSec);
+    addLayerNotes(notes, layers, p, stepSec);
     
     return notes;
 }

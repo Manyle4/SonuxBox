@@ -1,15 +1,18 @@
 import type { AnalysisMode, AnalyzeResult } from './api'
+import type { TrackInfo } from './describe'
 import list from './tracks.json'
 
-export interface Track {
+export interface Track extends TrackInfo {
   id: string
   title: string
   about: string // what the data shows
   listen: string // what to listen for
   mode: AnalysisMode // the mode that suits this image best
   crop?: number // share of the bottom to ignore; 0 for images with no legend strip
+  cropTop?: number // share of the top to ignore (e.g. the NASA/GMAO logo)
   source: { label: string; url: string }
   frames?: { id: string; label: string }[] // a time-lapse: images played one after another
+  scale?: string // the image's colour bar as "#rrggbb:value;...", sent to the engine
 }
 
 // Frames from NASA's Earth Information Center visuals, made by the Scientific

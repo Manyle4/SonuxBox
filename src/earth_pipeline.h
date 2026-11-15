@@ -29,7 +29,25 @@ struct ColumnStats {
     std::array<double, kTerrainCount> fraction{};  // share of each terrain type, 0..1
     double landFraction = 0.0;                     // vegetation + land + ice together
     double landPos = 0.5;                          // vertical centre of the land: 0 = bottom, 1 = top
+    double peakPos = 0.5;                          // height of the strongest band (for naming places)
+    double value = -1.0;                           // median value read off a colour scale; -1 = none
 };
+
+// Height (0 bottom .. 1 top) of the strongest band in a column's per-row totals.
+// Smoothed over a few rows so one noisy pixel row can't win. Falls back if empty.
+inline double peakHeight(const std::vector<double>& rows, double fallback) {
+    const int n = static_cast<int>(rows.size());
+    if (n < 2) return fallback;
+    constexpr int kHalf = 4;
+    double best = 0.0;
+    int bestY = -1;
+    for (int y = 0; y < n; ++y) {
+        double s = 0.0;
+        for (int k = std::max(0, y - kHalf); k <= std::min(n - 1, y + kHalf); ++k) s += rows[k];
+        if (s > best) { best = s; bestY = y; }
+    }
+    return bestY < 0 ? fallback : 1.0 - static_cast<double>(bestY) / (n - 1);
+}
 
 // What we learned about the whole map.
 struct EarthAnalysis {
@@ -45,6 +63,14 @@ struct EarthMood {
     std::string scaleName;      // e.g. "D lydian". Empty = just use major/minor.
 };
 
+// A colour layer that got its own instrument (adaptive mode).
+struct LayerInfo {
+    std::string name;  // e.g. "purple"
+    std::string hex;   // e.g. "#b070e0"
+    double share = 0.0;
+    int voice = 4;     // 4 = pluck, 5 = bell
+};
+
 // Everything the pipeline produces, bundled together.
 struct EarthResult {
     EarthAnalysis analysis;
@@ -57,7 +83,9 @@ struct EarthResult {
     int imageWidth = 0;
     int imageHeight = 0;
     double cropBottom = kCropBottom;  // share of the bottom that was ignored
+    double cropTop = 0.0;             // share of the top that was ignored (logos)
     std::string analysisMode;   // "terrain" or "adaptive"
+    std::vector<LayerInfo> layers;  // colour layers with their own instrument (adaptive only)
 };
 
 inline bool isActiveData(Terrain t, bool isDarkMap) {
@@ -67,13 +95,19 @@ inline bool isActiveData(Terrain t, bool isDarkMap) {
     return false;
 }
 
-inline EarthAnalysis analyzeEarth(const cv::Mat& image, double cropBottom = kCropBottom) {
+// The part of the (resized) image that gets analysed: drops the top and bottom strips.
+inline cv::Mat cropRows(const cv::Mat& img, double cropTop, double cropBottom) {
+    const int top = static_cast<int>(img.rows * cropTop);
+    const int keep = std::max(1, static_cast<int>(img.rows * (1.0 - cropTop - cropBottom)));
+    return img(cv::Rect(0, top, img.cols, std::min(keep, img.rows - top)));
+}
+
+inline EarthAnalysis analyzeEarth(const cv::Mat& image, double cropBottom = kCropBottom, double cropTop = 0.0) {
     // 256-pixel-wide copy, with the legend strip cut off the bottom.
     const double scale = 256.0 / image.cols;
     cv::Mat mid;
     cv::resize(image, mid, cv::Size(), scale, scale, cv::INTER_AREA);
-    const int keepRows = static_cast<int>(mid.rows * (1.0 - cropBottom));
-    const cv::Mat map = mid(cv::Rect(0, 0, mid.cols, keepRows));
+    const cv::Mat map = cropRows(mid, cropTop, cropBottom);
 
     cv::Mat hsv;
     cv::cvtColor(map, hsv, cv::COLOR_BGR2HSV);
@@ -85,6 +119,9 @@ inline EarthAnalysis analyzeEarth(const cv::Mat& image, double cropBottom = kCro
 
     // Store row sums for each terrain type per column so we can compute landPos afterward
     std::vector<std::array<double, kTerrainCount>> colRowSums(kColumns);
+    // Per-row counts too, to find each column's strongest band.
+    std::vector<std::vector<std::array<float, kTerrainCount>>> rowCounts(
+        kColumns, std::vector<std::array<float, kTerrainCount>>(hsv.rows));
 
     for (int c = 0; c < kColumns; ++c) {
         const int x0 = c * hsv.cols / kColumns;
@@ -100,6 +137,7 @@ inline EarthAnalysis analyzeEarth(const cv::Mat& image, double cropBottom = kCro
                 counts[i] += 1.0;
                 overallCounts[i] += 1.0;
                 colRowSums[c][i] += y;
+                rowCounts[c][y][i] += 1.0f;
                 total += 1.0;
             }
         }
@@ -139,6 +177,14 @@ inline EarthAnalysis analyzeEarth(const cv::Mat& image, double cropBottom = kCro
         if (activePixels > 0.0 && hsv.rows > 1) {
             col.landPos = 1.0 - (activeRowSum / activePixels) / (hsv.rows - 1);
         }
+
+        std::vector<double> active(hsv.rows, 0.0);
+        for (int y = 0; y < hsv.rows; ++y) {
+            for (int i = 0; i < kTerrainCount; ++i) {
+                if (isActiveData(static_cast<Terrain>(i), isDarkMap)) active[y] += rowCounts[c][y][i];
+            }
+        }
+        col.peakPos = peakHeight(active, col.landPos);
     }
 
     return result;
@@ -167,6 +213,8 @@ inline const char* voiceName(int voice) {
         case 1: return "bass";
         case 2: return "pad";
         case 3: return "perc";
+        case 4: return "pluck";
+        case 5: return "bell";
         default: return "melody";
     }
 }
@@ -359,6 +407,7 @@ inline std::string buildJson(const std::string& imageName, const std::string& au
     f << "  \"imageWidth\": " << r.imageWidth << ",\n";
     f << "  \"imageHeight\": " << r.imageHeight << ",\n";
     f << "  \"cropBottom\": " << r.cropBottom << ",\n";
+    f << "  \"cropTop\": " << r.cropTop << ",\n";
     f << "  \"columns\": " << kColumns << ",\n";
     f << "  \"stepSec\": " << stepSec << ",\n";
     f << "  \"musicSec\": " << r.musicSec << ",\n";
@@ -371,12 +420,22 @@ inline std::string buildJson(const std::string& imageName, const std::string& au
     }
     f << "},\n";
 
+    f << "  \"layers\": [";
+    for (std::size_t i = 0; i < r.layers.size(); ++i) {
+        const LayerInfo& L = r.layers[i];
+        f << (i ? ", " : "") << "{\"color\": \"" << jsonEscape(L.name) << "\", \"hex\": \"" << L.hex
+          << "\", \"share\": " << L.share << ", \"voice\": \"" << voiceName(L.voice) << "\"}";
+    }
+    f << "],\n";
+
     f << "  \"columnStats\": [\n";
     for (int c = 0; c < kColumns; ++c) {
         const ColumnStats& col = r.analysis.columns[c];
         f << "    {\"land\": " << col.landFraction
           << ", \"ocean\": " << col.fraction[static_cast<int>(Terrain::Ocean)]
-          << ", \"landPos\": " << col.landPos << "}" << (c + 1 < kColumns ? "," : "") << "\n";
+          << ", \"landPos\": " << col.landPos << ", \"peakPos\": " << col.peakPos;
+        if (col.value >= 0.0) f << ", \"value\": " << col.value;
+        f << "}" << (c + 1 < kColumns ? "," : "") << "\n";
     }
     f << "  ],\n";
 

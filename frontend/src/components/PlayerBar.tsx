@@ -6,7 +6,7 @@ interface Props {
   time: number
   duration: number
   onToggle: () => void
-  onDownload: () => void
+  onDownload: () => void | Promise<void>
 }
 
 const clock = (sec: number) => {

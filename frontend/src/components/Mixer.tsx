@@ -1,4 +1,7 @@
-import type { Voice } from '../api'
+import type { Layer, Voice } from '../api'
+import { layerName, type TrackInfo } from '../describe'
+
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1)
 
 interface Props {
   muted: Set<Voice>
@@ -6,6 +9,10 @@ interface Props {
   rate: number
   onRate: (r: number) => void
   hasPerc: boolean
+  layers: Layer[] // colour layers that actually play
+  info?: TrackInfo
+  reverb: boolean
+  onReverb: () => void
 }
 
 const LAYERS: { id: Voice; label: string }[] = [
@@ -17,21 +24,30 @@ const LAYERS: { id: Voice; label: string }[] = [
 const RATES = [0.75, 1, 1.25, 1.5]
 
 // Live controls: switch layers on/off and change the speed.
-export function Mixer({ muted, onToggle, rate, onRate, hasPerc }: Props) {
+export function Mixer({ muted, onToggle, rate, onRate, hasPerc, layers, reverb, onReverb, info }: Props) {
   return (
     <div className="mixer">
       <div className="group" role="group" aria-label="Layers">
         <span className="label">Layers</span>
-        {LAYERS.filter((l) => l.id !== 'perc' || hasPerc).map((l) => (
+        {[
+          ...LAYERS.filter((l) => l.id !== 'perc' || hasPerc),
+          ...layers.map((l) => ({ id: l.voice as Voice, label: `${cap(layerName(l, info))} (${l.voice})`, hex: l.hex })),
+        ].map((l) => (
           <button
             key={l.id}
             className={`layer ${l.id}${muted.has(l.id) ? ' off' : ''}`}
+            style={'hex' in l ? ({ '--swatch': l.hex } as React.CSSProperties) : undefined}
             aria-pressed={!muted.has(l.id)}
             onClick={() => onToggle(l.id)}
           >
             {l.label}
           </button>
         ))}
+      </div>
+      <div className="group">
+        <button className={`rate${reverb ? ' on' : ''}`} aria-pressed={reverb} onClick={onReverb}>
+          Reverb
+        </button>
       </div>
       <div className="group" role="group" aria-label="Speed">
         <span className="label">Speed</span>
