@@ -76,7 +76,7 @@ export default function App() {
         src.frames.map(
           async (f) =>
             (f.id && (await prerendered(f.id, m))) ||
-            (await analyze(f.blob, f.name, m, src.track?.crop, ctrl.signal)),
+            (await analyze(f.blob, f.name, m, src.track?.crop, ctrl.signal, src.track?.cropTop)),
         ),
       )
       if (ctrl.signal.aborted) return

@@ -46,11 +46,11 @@ export function regionAt(lat: number, lon: number) {
   return hit ? hit[0] : 'the open ocean'
 }
 
-// Where slice `col` is, with the signal's height (landPos: 0 bottom .. 1 top of the
-// analysed area, which is the image minus the cropped bottom strip).
-export function placeOf(geo: Geo, col: number, columns: number, landPos: number, cropBottom: number) {
+// Where slice `col` is, with the signal's height (pos: 0 bottom .. 1 top of the
+// analysed area, which is the image minus the cropped top and bottom strips).
+export function placeOf(geo: Geo, col: number, columns: number, pos: number, cropBottom: number, cropTop = 0) {
   const lon = geo.west + ((col + 0.5) / columns) * (geo.east - geo.west)
-  const y = (1 - landPos) * (1 - cropBottom) // 0 = top of the image
+  const y = cropTop + (1 - pos) * (1 - cropTop - cropBottom) // 0 = top of the image
   const lat = geo.north - y * (geo.north - geo.south)
   return regionAt(lat, lon)
 }

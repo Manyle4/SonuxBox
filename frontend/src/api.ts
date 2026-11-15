@@ -35,6 +35,7 @@ export interface AnalyzeResult {
   imageWidth: number
   imageHeight: number
   cropBottom: number // bottom share of the image the engine ignores (legends)
+  cropTop?: number // top share it ignores (logos); newer engine only
   columns: number
   stepSec: number
   musicSec: number // last note lets go here
@@ -54,11 +55,14 @@ async function readError(res: Response): Promise<string> {
   return `Server error (${res.status})`
 }
 
-export async function analyze(file: Blob, name: string, mode: AnalysisMode, crop?: number, signal?: AbortSignal) {
+export async function analyze(
+  file: Blob, name: string, mode: AnalysisMode, crop?: number, signal?: AbortSignal, cropTop?: number,
+) {
   const form = new FormData()
   form.append('image', file, name)
   form.append('mode', mode)
   if (crop !== undefined) form.append('crop', String(crop))
+  if (cropTop !== undefined) form.append('cropTop', String(cropTop))
 
   const res = await fetch(`${API_URL}/api/analyze`, { method: 'POST', body: form, signal })
   if (!res.ok) throw new Error(await readError(res))

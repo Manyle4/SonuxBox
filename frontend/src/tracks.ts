@@ -9,6 +9,7 @@ export interface Track {
   listen: string // what to listen for
   mode: AnalysisMode // the mode that suits this image best
   crop?: number // share of the bottom to ignore; 0 for images with no legend strip
+  cropTop?: number // share of the top to ignore (e.g. the NASA/GMAO logo)
   source: { label: string; url: string }
   frames?: { id: string; label: string }[] // a time-lapse: images played one after another
   geo?: Geo // set for flat world maps, so descriptions can name places

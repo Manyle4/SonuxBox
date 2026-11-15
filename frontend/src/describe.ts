@@ -45,7 +45,7 @@ export function columnInfo(r: AnalyzeResult, col: number): ColumnInfo {
 
 // Region name for a slice, or null when the image isn't a known world map.
 export const placeAt = (r: AnalyzeResult, col: number, geo?: Geo) =>
-  geo ? placeOf(geo, col, r.columns, r.columnStats[col].peakPos ?? r.columnStats[col].landPos, r.cropBottom) : null
+  geo ? placeOf(geo, col, r.columns, r.columnStats[col].peakPos ?? r.columnStats[col].landPos, r.cropBottom, r.cropTop) : null
 
 // Short line for the explore slider and live captions, read out by screen readers.
 export function describeColumn(r: AnalyzeResult, col: number, geo?: Geo) {
@@ -58,6 +58,20 @@ export function describeColumn(r: AnalyzeResult, col: number, geo?: Geo) {
 }
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1)
+
+// The 2-3 regions with the most signal in a stretch of slices, in left-to-right order.
+function mainPlaces(r: AnalyzeResult, infos: ColumnInfo[], from: number, to: number, geo: Geo) {
+  const score = new Map<string, { total: number; first: number }>()
+  for (let c = from; c <= to; c++) {
+    const p = placeAt(r, c, geo)!
+    const e = score.get(p) ?? { total: 0, first: c }
+    e.total += infos[c].strength
+    score.set(p, e)
+  }
+  const top = [...score.entries()].sort((a, b) => b[1].total - a[1].total).slice(0, 3)
+  const names = top.sort((a, b) => a[1].first - b[1].first).map(([p]) => p)
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]
+}
 
 // A few sentences describing the whole piece, built from the same numbers that made the music.
 export function describePiece(r: AnalyzeResult, title: string, geo?: Geo) {
@@ -93,7 +107,7 @@ export function describePiece(r: AnalyzeResult, title: string, geo?: Geo) {
     'The image is read from left to right, one slice per beat.',
     best.to >= best.from
       ? (geo
-          ? `The melody is busiest from ${placeAt(r, best.from, geo)} to ${placeAt(r, best.to, geo)} `
+          ? `The melody is busiest over ${mainPlaces(r, infos, best.from, best.to, geo)} `
           : `The melody is busiest from ${across(best.from, r.columns)} to ${across(best.to, r.columns)} of the image `) +
         `(about ${secs(best.from * r.stepSec)} to ${secs((best.to + 1) * r.stepSec)} in).`
       : 'The image has very little signal, so the melody is sparse.',

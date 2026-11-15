@@ -14,7 +14,8 @@
       "east": 180,
       "north": 90,
       "south": -90
-    }
+    },
+    "cropTop": 0.08
   },
   {
     "id": "o3",
@@ -31,7 +32,8 @@
       "east": 180,
       "north": 90,
       "south": -90
-    }
+    },
+    "cropTop": 0.08
   },
   {
     "id": "nox",
@@ -48,7 +50,8 @@
       "east": 180,
       "north": 90,
       "south": -90
-    }
+    },
+    "cropTop": 0.08
   },
   {
     "id": "aerosol",
