@@ -6,6 +6,8 @@ interface Props {
   rate: number
   onRate: (r: number) => void
   hasPerc: boolean
+  reverb: boolean
+  onReverb: () => void
 }
 
 const LAYERS: { id: Voice; label: string }[] = [
@@ -17,7 +19,7 @@ const LAYERS: { id: Voice; label: string }[] = [
 const RATES = [0.75, 1, 1.25, 1.5]
 
 // Live controls: switch layers on/off and change the speed.
-export function Mixer({ muted, onToggle, rate, onRate, hasPerc }: Props) {
+export function Mixer({ muted, onToggle, rate, onRate, hasPerc, reverb, onReverb }: Props) {
   return (
     <div className="mixer">
       <div className="group" role="group" aria-label="Layers">
@@ -32,6 +34,11 @@ export function Mixer({ muted, onToggle, rate, onRate, hasPerc }: Props) {
             {l.label}
           </button>
         ))}
+      </div>
+      <div className="group">
+        <button className={`rate${reverb ? ' on' : ''}`} aria-pressed={reverb} onClick={onReverb}>
+          Reverb
+        </button>
       </div>
       <div className="group" role="group" aria-label="Speed">
         <span className="label">Speed</span>

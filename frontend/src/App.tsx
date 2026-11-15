@@ -38,6 +38,7 @@ export default function App() {
   const [results, setResults] = useState<AnalyzeResult[] | null>(null)
   const [rate, setRate] = useState(1)
   const [muted, setMuted] = useState<Set<Voice>>(new Set())
+  const [reverb, setReverb] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [slow, setSlow] = useState(false) // eco dynos nap; the first call can take a while
   const [announce, setAnnounce] = useState('') // read out by screen readers
@@ -50,7 +51,7 @@ export default function App() {
     return joinFrames(results.map((r, i) => ({ result: atSpeed(r, rate), label: source.frames[i].label, imageUrl: source.frames[i].url })))
   }, [results, source, rate])
   const piece = joined?.piece ?? null
-  const audio = useAudioEngine(status === 'ready' && piece ? piece.notes : null, 1, muted)
+  const audio = useAudioEngine(status === 'ready' && piece ? piece.notes : null, 1, muted, reverb)
   const { playing, time, toggle, seek } = audio
 
   // Wake the server while people look around, so their first upload is quick.
@@ -203,8 +204,8 @@ export default function App() {
       return next
     })
 
-  const download = () => {
-    const blob = audio.exportWav()
+  const download = async () => {
+    const blob = await audio.exportWav()
     if (!blob) return
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -291,6 +292,7 @@ export default function App() {
                   <PlayerBar result={piece} playing={playing} time={time} duration={audio.duration}
                     onToggle={toggle} onDownload={download} />
                   <Mixer muted={muted} onToggle={toggleLayer} rate={rate} onRate={setRate}
+                    reverb={reverb} onReverb={() => setReverb((r) => !r)}
                     hasPerc={piece.notes.some((n) => n.voice === 'perc')} />
                   <Caption result={seg.result} time={segTime} playing={playing} geo={geo} />
                   <PianoRoll result={piece} time={time} onSeek={seek} muted={muted}
