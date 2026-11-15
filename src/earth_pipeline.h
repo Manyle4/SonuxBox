@@ -74,6 +74,7 @@ struct EarthResult {
     int imageWidth = 0;
     int imageHeight = 0;
     double cropBottom = kCropBottom;  // share of the bottom that was ignored
+    double cropTop = 0.0;             // share of the top that was ignored (logos)
     std::string analysisMode;   // "terrain" or "adaptive"
 };
 
@@ -84,13 +85,19 @@ inline bool isActiveData(Terrain t, bool isDarkMap) {
     return false;
 }
 
-inline EarthAnalysis analyzeEarth(const cv::Mat& image, double cropBottom = kCropBottom) {
+// The part of the (resized) image that gets analysed: drops the top and bottom strips.
+inline cv::Mat cropRows(const cv::Mat& img, double cropTop, double cropBottom) {
+    const int top = static_cast<int>(img.rows * cropTop);
+    const int keep = std::max(1, static_cast<int>(img.rows * (1.0 - cropTop - cropBottom)));
+    return img(cv::Rect(0, top, img.cols, std::min(keep, img.rows - top)));
+}
+
+inline EarthAnalysis analyzeEarth(const cv::Mat& image, double cropBottom = kCropBottom, double cropTop = 0.0) {
     // 256-pixel-wide copy, with the legend strip cut off the bottom.
     const double scale = 256.0 / image.cols;
     cv::Mat mid;
     cv::resize(image, mid, cv::Size(), scale, scale, cv::INTER_AREA);
-    const int keepRows = static_cast<int>(mid.rows * (1.0 - cropBottom));
-    const cv::Mat map = mid(cv::Rect(0, 0, mid.cols, keepRows));
+    const cv::Mat map = cropRows(mid, cropTop, cropBottom);
 
     cv::Mat hsv;
     cv::cvtColor(map, hsv, cv::COLOR_BGR2HSV);
@@ -388,6 +395,7 @@ inline std::string buildJson(const std::string& imageName, const std::string& au
     f << "  \"imageWidth\": " << r.imageWidth << ",\n";
     f << "  \"imageHeight\": " << r.imageHeight << ",\n";
     f << "  \"cropBottom\": " << r.cropBottom << ",\n";
+    f << "  \"cropTop\": " << r.cropTop << ",\n";
     f << "  \"columns\": " << kColumns << ",\n";
     f << "  \"stepSec\": " << stepSec << ",\n";
     f << "  \"musicSec\": " << r.musicSec << ",\n";

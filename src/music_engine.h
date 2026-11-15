@@ -22,13 +22,13 @@ inline const char* modeName(AnalysisMode m) {
 // Returns true on success; on failure returns false with a message in 'error'.
 inline bool generateMusic(const cv::Mat& image, int sampleRate, AnalysisMode mode,
                           EarthResult& out, std::string& error, bool verbose = false,
-                          double cropBottom = kCropBottom) {
+                          double cropBottom = kCropBottom, double cropTop = 0.0) {
     if (image.empty()) {
         error = "image is empty or could not be decoded";
         return false;
     }
-    if (cropBottom < 0.0 || cropBottom > kMaxCrop) {
-        error = "crop must be between 0 and 0.3";
+    if (cropBottom < 0.0 || cropBottom > kMaxCrop || cropTop < 0.0 || cropTop > kMaxCrop) {
+        error = "crop and cropTop must be between 0 and 0.3";
         return false;
     }
     if (image.cols < 16 || image.rows < 16) {
@@ -37,7 +37,7 @@ inline bool generateMusic(const cv::Mat& image, int sampleRate, AnalysisMode mod
     }
 
     if (mode == AnalysisMode::Adaptive) {
-        const SignalMap sig = computeSignalMap(image, 4, cropBottom);
+        const SignalMap sig = computeSignalMap(image, 4, cropBottom, cropTop);
         out.analysis = analyzeAdaptive(sig);
         const ImageTraits traits = measureTraits(sig, out.analysis);
         const MusicProfile profile = chooseProfile(traits);
@@ -50,7 +50,7 @@ inline bool generateMusic(const cv::Mat& image, int sampleRate, AnalysisMode mod
         }
         out.notes = composeNotes(out.analysis, profile, verbose);
     } else {
-        out.analysis = analyzeEarth(image, cropBottom);
+        out.analysis = analyzeEarth(image, cropBottom, cropTop);
         out.mood = decideMood(out.analysis.overall);
         out.mood.scaleName = out.mood.major ? "major pentatonic" : "minor pentatonic";
         out.notes = buildNotes(out.analysis, out.mood, verbose);
@@ -73,5 +73,6 @@ inline bool generateMusic(const cv::Mat& image, int sampleRate, AnalysisMode mod
     out.imageHeight = image.rows;
     out.analysisMode = modeName(mode);
     out.cropBottom = cropBottom;
+    out.cropTop = cropTop;
     return true;
 }

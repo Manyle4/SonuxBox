@@ -148,10 +148,12 @@ int main() {
 
     // Takes either FormData (file field "image") or the raw image bytes as the body.
     // Mode: ?mode=adaptive|terrain, or a "mode" form field. Defaults to adaptive.
-    // Crop: ?crop=0..0.3 (or a form field), the share of the bottom to ignore. Defaults to 0.12.
+    // Crop: ?crop=0..0.3 / ?cropTop=0..0.3 (or form fields): bottom and top strips to ignore.
+    // Defaults: crop 0.12 (legend + timestamp), cropTop 0.
     svr.Post("/api/analyze", [&](const httplib::Request& req, httplib::Response& res) {
         std::string modeText = req.get_param_value("mode");
         std::string cropText = req.get_param_value("crop");
+        std::string cropTopText = req.get_param_value("cropTop");
         std::string imageName = "upload";
         std::string formBytes;
         const std::string* bytes = &req.body;
@@ -168,9 +170,8 @@ int main() {
             if (modeText.empty() && req.form.has_field("mode")) {
                 modeText = req.form.get_field("mode");
             }
-            if (cropText.empty() && req.form.has_field("crop")) {
-                cropText = req.form.get_field("crop");
-            }
+            if (cropText.empty() && req.form.has_field("crop")) cropText = req.form.get_field("crop");
+            if (cropTopText.empty() && req.form.has_field("cropTop")) cropTopText = req.form.get_field("cropTop");
         }
 
         AnalysisMode mode;
@@ -178,17 +179,22 @@ int main() {
             sendError(res, 400, "mode must be \"adaptive\" or \"terrain\"");
             return;
         }
-        // crop = share of the bottom to ignore (legends, timestamps). 0 for clean images.
-        double crop = kCropBottom;
-        if (!cropText.empty()) {
+        // crop / cropTop = share of the bottom / top to ignore (legends, logos). 0 for clean images.
+        auto parseCrop = [&](const std::string& text, double fallback, double& out) {
+            out = fallback;
+            if (text.empty()) return true;
             try {
                 std::size_t used = 0;
-                crop = std::stod(cropText, &used);
-                if (used != cropText.size() || crop < 0.0 || crop > kMaxCrop) throw std::invalid_argument("");
+                out = std::stod(text, &used);
+                return used == text.size() && out >= 0.0 && out <= kMaxCrop;
             } catch (const std::exception&) {
-                sendError(res, 400, "crop must be a number from 0 to 0.3");
-                return;
+                return false;
             }
+        };
+        double crop = kCropBottom, cropTop = 0.0;
+        if (!parseCrop(cropText, kCropBottom, crop) || !parseCrop(cropTopText, 0.0, cropTop)) {
+            sendError(res, 400, "crop and cropTop must be numbers from 0 to 0.3");
+            return;
         }
         if (bytes->empty()) {
             sendError(res, 400, "no image: send FormData with an \"image\" file, or the raw image bytes");
@@ -217,7 +223,7 @@ int main() {
 
             EarthResult result;
             std::string error;
-            if (!generateMusic(image, kSampleRate, mode, result, error, false, crop)) {
+            if (!generateMusic(image, kSampleRate, mode, result, error, false, crop, cropTop)) {
                 sendError(res, 422, error);
                 return;
             }
@@ -238,7 +244,7 @@ int main() {
 
     std::cout << "Server running on port " << port << ".\n"
               << "  GET  http://localhost:" << port << "/api/health\n"
-              << "  POST http://localhost:" << port << "/api/analyze?mode=adaptive|terrain&crop=0..0.3\n"
+              << "  POST http://localhost:" << port << "/api/analyze?mode=adaptive|terrain&crop=0..0.3&cropTop=0..0.3\n"
               << "  GET  http://localhost:" << port << "/audio/<id>.wav\n";
 
     if (!svr.listen("0.0.0.0", port)) {
