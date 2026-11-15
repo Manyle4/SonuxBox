@@ -20,17 +20,23 @@ export function CopyLink() {
 }
 
 // Reads the description out (recorded voice when available).
-export function ReadAloud({ text, recording }: { text: string; recording?: string }) {
+export function ReadAloud({ text, recording, onStart }: { text: string; recording?: string; onStart?: () => void }) {
   const [speaking, setSpeaking] = useState(false)
   const speechRef = useRef<Speech | null>(null)
 
   useEffect(() => () => speechRef.current?.stop(), [text]) // new piece: stop talking about the old one
+  useEffect(() => {
+    const hush = () => speechRef.current?.stop() // the music started
+    window.addEventListener('sonux:music', hush)
+    return () => window.removeEventListener('sonux:music', hush)
+  }, [])
 
   const toggle = () => {
     if (speaking) {
       speechRef.current?.stop()
       return
     }
+    onStart?.() // pause the music: one thing talking at a time
     const sp = speak(text, recording)
     speechRef.current = sp
     setSpeaking(true)

@@ -235,6 +235,8 @@ export function useAudioEngine(notes: Note[] | null, gridSec: number, muted: Set
 
   // Call from a click, so later (async) playback is allowed to make sound.
   const unlock = useCallback(() => void ctx().resume(), [])
+  // False when the browser hasn't let us make sound yet (no click so far).
+  const canPlay = useCallback(() => ctxRef.current?.state === 'running', [])
 
-  return { ready: !!rendered && !rendering, rendering, playing, time, duration, toggle, seek, exportWav, unlock }
+  return { ready: !!rendered && !rendering, rendering, playing, time, duration, toggle, seek, exportWav, unlock, canPlay }
 }

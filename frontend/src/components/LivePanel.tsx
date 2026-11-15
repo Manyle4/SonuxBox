@@ -4,11 +4,12 @@ import { daysAgo, LIVE_LAYERS, yearBefore } from '../live'
 interface Props {
   onPlay: (layer: string, date: string, then?: string) => void
   busy: boolean
+  error?: string | null
   disabled?: boolean
 }
 
 // Pick a NASA layer and a day; optionally an earlier day to hear the change.
-export function LivePanel({ onPlay, busy, disabled }: Props) {
+export function LivePanel({ onPlay, busy, error, disabled }: Props) {
   const [layerId, setLayerId] = useState(LIVE_LAYERS[0].id)
   const layer = LIVE_LAYERS.find((l) => l.id === layerId)!
   const [date, setDate] = useState(daysAgo(LIVE_LAYERS[0].lagDays))
@@ -61,6 +62,7 @@ export function LivePanel({ onPlay, busy, disabled }: Props) {
       <button type="submit" className="primary" disabled={disabled || busy || !okThen}>
         {busy ? 'Fetching from NASA…' : compare ? '▶ Play the change' : '▶ Play this day'}
       </button>
+      {error && <p className="error" role="alert">{error}</p>}
       <p className="hint small">The newest day or two may not be ready yet.</p>
     </form>
   )

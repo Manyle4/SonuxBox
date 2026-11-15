@@ -32,6 +32,11 @@ export function PlayerBar({ result, playing, time, duration, onToggle, onDownloa
   // Once the bar scrolls off screen, a small copy sits at the bottom so play/pause stays in reach.
   const ref = useRef<HTMLDivElement>(null)
   const [away, setAway] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const save = async () => {
+    setSaving(true)
+    try { await onDownload() } finally { setSaving(false) }
+  }
   useEffect(() => {
     const el = ref.current
     if (!el) return
@@ -54,8 +59,8 @@ export function PlayerBar({ result, playing, time, duration, onToggle, onDownloa
         <li>{result.notes.filter((n) => n.voice !== 'perc').length} notes</li>
         <li>{result.analysisMode}</li>
       </ul>
-      <button className="download" onClick={onDownload}>
-        Download WAV
+      <button className="download" onClick={save} disabled={saving} aria-busy={saving}>
+        {saving ? 'Preparing WAV…' : 'Download WAV'}
       </button>
       {away && (
         <div className="miniplayer" role="region" aria-label="Mini player">

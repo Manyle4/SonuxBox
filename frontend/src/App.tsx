@@ -79,7 +79,22 @@ export default function App() {
   }, [results, source, rate, compareResult])
   const piece = joined?.piece ?? null
   const audio = useAudioEngine(status === 'ready' && piece ? piece.notes : null, 1, muted, reverb)
-  const { playing, time, toggle, seek } = audio
+  const { playing, time, toggle, seek, canPlay } = audio
+
+  // Set when someone asks for a piece (a tile, "Play this day", an upload): it starts by
+  // itself once it's ready. Links opened cold don't, since browsers block sound without a click.
+  const autoplay = useRef(false)
+  const userPlay = () => {
+    audio.unlock()
+    autoplay.current = true
+  }
+  // Each pick gets a number, so a slow load can't replace something picked after it.
+  const pickId = useRef(0)
+
+  // Music, spoken descriptions and the sound key take turns.
+  useEffect(() => {
+    if (playing) window.dispatchEvent(new Event('sonux:music'))
+  }, [playing])
 
   useEffect(() => {
     setCompareResult(null)
@@ -106,6 +121,7 @@ export default function App() {
     abortRef.current = ctrl
 
     const title = src.track?.title ?? src.name
+    setResults(null) // stops the old piece, so it doesn't play under the new image
     setStatus('loading')
     setError(null)
     setSlow(false)
@@ -137,6 +153,7 @@ export default function App() {
       let message = e instanceof Error ? e.message : 'Something went wrong'
       if (src.track?.live && /uniform|no signal/i.test(message))
         message = 'NASA has no data for that day yet (or the map is empty). Try a day or two earlier.'
+      autoplay.current = false
       setResults(null)
       setError(message)
       setStatus('error')
@@ -163,6 +180,7 @@ export default function App() {
   }, [source])
 
   const fail = (message: string) => {
+    autoplay.current = false
     setError(message)
     setStatus('error')
     setAnnounce(`Error: ${message}`)
@@ -171,6 +189,7 @@ export default function App() {
   const onFile = (file: File) => {
     if (!/^image\/(png|jpeg)$/.test(file.type)) return fail('Please pick a PNG or JPEG image.')
     if (file.size > MAX_UPLOAD_BYTES) return fail('That image is over 20 MB. Try a smaller copy.')
+    ++pickId.current
     setLink(null, null) // uploads can't be shared by link
     setCompareId(null)
     const frame = { id: null, blob: file, name: file.name, url: URL.createObjectURL(file), label: '' }
@@ -182,6 +201,7 @@ export default function App() {
     if (!track) return
     const useMode = m ?? track.mode // each track starts in the mode that suits it
     if (track.frames || compareId === id) setCompareId(null)
+    const pick = ++pickId.current
     try {
       const frames = await Promise.all(
         framesOf(track).map(async (f) => {
@@ -189,19 +209,23 @@ export default function App() {
           return { id: f.id, blob: await (await fetch(url)).blob(), name: `${f.id}.jpg`, url, label: f.label }
         }),
       )
+      if (pick !== pickId.current) return // something else was picked meanwhile
       setMode(useMode)
       pickSource({ name: track.title, track, frames }, useMode)
     } catch {
-      fail('Could not load that track.')
+      if (pick === pickId.current) fail('Could not load that track.')
     }
   }
 
   // A live NASA map (or two days of one): fetch, read the real values, then play.
   const [liveBusy, setLiveBusy] = useState(false)
+  const [liveError, setLiveError] = useState<string | null>(null)
   const onLive = async (layerId: string, date: string, then?: string) => {
     const layer = LIVE_LAYERS.find((l) => l.id === layerId)
     if (!layer) return
+    const pick = ++pickId.current
     setCompareId(null)
+    setLiveError(null)
     setLiveBusy(true)
     setAnnounce(`Fetching ${layer.title} from NASA…`)
     try {
@@ -223,12 +247,18 @@ export default function App() {
           return { id: null, blob, name: `${layer.id}-${d}.png`, url, label: then ? prettyDate(d) : '', readAt }
         }),
       )
+      if (pick !== pickId.current) return // something else was picked meanwhile
       setMode('adaptive')
       const track = liveTrack(layer, date, then)
       setLiveLink(layer.id, date, then)
       pickSource({ name: track.title, track, frames }, 'adaptive')
     } catch {
-      fail("Couldn't get that map from NASA. Check your connection, or try another day.")
+      if (pick !== pickId.current) return
+      // Shown next to the form, where you are, rather than up in the player.
+      const message = "Couldn't get that map from NASA. Check your connection, or try another day."
+      autoplay.current = false
+      setLiveError(message)
+      setAnnounce(`Error: ${message}`)
     } finally {
       setLiveBusy(false)
     }
@@ -237,6 +267,7 @@ export default function App() {
   // Changing mode re-runs the current image.
   const onMode = (m: AnalysisMode) => {
     setMode(m)
+    if (playing) userPlay() // keep playing in the new mode
     if (source) void run(source, m)
   }
 
@@ -342,6 +373,22 @@ export default function App() {
   const ready = status === 'ready' && joined && audio.ready
   const series = (joined?.segments.length ?? 0) > 1
 
+  // Asked-for pieces start as soon as their sound is ready.
+  useEffect(() => {
+    if (!autoplay.current || status !== 'ready' || !audio.ready) return
+    autoplay.current = false
+    if (!canPlay()) return // the browser wants a click first; the play button is right there
+    seek(0)
+    setAnnounce(`Playing ${title}. Space pauses.`)
+  }, [status, audio.ready, canPlay, seek, title])
+
+  // Picking what's already loaded (a tile, or the same live day) plays or pauses it instead of reloading.
+  const isLoaded = (t: { id?: string; live?: { layer: string; date: string; then?: string } }) =>
+    status === 'ready' && audio.ready && !!track &&
+    (t.live
+      ? !!track.live && track.live.layer === t.live.layer && track.live.date === t.live.date && track.live.then === t.live.then
+      : !track.live && track.id === t.id)
+
   // The frame on screen: the one playing, or the first.
   const segIndex = joined ? segmentAt(joined.segments, time) : 0
   const seg = joined?.segments[segIndex] ?? null
@@ -424,11 +471,21 @@ export default function App() {
       <main>
         <section className="inputs" aria-label="Choose an image">
           <h2>Earth Jukebox</h2>
-          <Gallery activeId={track?.id ?? null} onPick={(id) => { if (tourStep !== null) stopTour(); void onTrack(id) }} disabled={loading} />
+          <Gallery activeId={track?.id ?? null} onPick={(id) => {
+            if (tourStep !== null) stopTour()
+            if (isLoaded({ id })) return toggle()
+            userPlay()
+            void onTrack(id)
+          }} />
           <h2 id="live">Live from NASA</h2>
-          <LivePanel onPlay={(l, d, t) => { if (tourStep !== null) stopTour(); void onLive(l, d, t) }} busy={liveBusy} disabled={loading} />
+          <LivePanel busy={liveBusy} error={liveError} onPlay={(l, d, t) => {
+            if (tourStep !== null) stopTour()
+            if (isLoaded({ live: { layer: l, date: d, then: t } })) return toggle()
+            userPlay()
+            void onLive(l, d, t)
+          }} />
           <h2>Or use your own image</h2>
-          <Dropzone onFile={onFile} disabled={loading} />
+          <Dropzone onFile={(f) => { userPlay(); onFile(f) }} />
           <ModeToggle mode={mode} onChange={onMode} disabled={loading} />
         </section>
 
@@ -529,7 +586,8 @@ export default function App() {
                   <section className="hearing" aria-labelledby="hearing-title">
                     <div className="hearing-head">
                       <h3 id="hearing-title">What you're hearing</h3>
-                      <ReadAloud text={spoken} recording={track && !track.live ? narrationKey(track, mode) : undefined} />
+                      <ReadAloud text={spoken} recording={track && !track.live ? narrationKey(track, mode) : undefined}
+                        onStart={() => { if (playing) toggle() }} />
                     </div>
                     {track && <p className="about">{track.about} {track.listen}</p>}
                     <p>{description}</p>

@@ -55,6 +55,10 @@ export function SoundKey({ result, info, onBusy }: Props) {
     setRunning(false)
   }
   useEffect(() => () => stop(), [result]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    window.addEventListener('sonux:music', stop) // the music started
+    return () => window.removeEventListener('sonux:music', stop)
+  }) // re-binds each render so it always has the current stop()
 
   const one = async (it: KeyItem) => {
     stop()
