@@ -12,7 +12,7 @@ import { PianoRoll } from './components/PianoRoll'
 import { PlayerBar } from './components/PlayerBar'
 import { describeCompare, describePiece, describeSeries } from './describe'
 import { setLink, setLiveLink } from './link'
-import { displayImage, fetchColormap, LIVE_LAYERS, liveTrack, parseColormap, pixelsOf, prettyDate, readValues, validDate, wmsUrl } from './live'
+import { coastlines, displayImage, fetchColormap, fetchWorld, LIVE_LAYERS, liveTrack, parseColormap, pixelsOf, pngOf, prettyDate, readValues, validDate } from './live'
 import { LivePanel } from './components/LivePanel'
 import { SoundKey } from './components/SoundKey'
 import { DataPanel } from './components/DataPanel'
@@ -205,21 +205,21 @@ export default function App() {
     setLiveBusy(true)
     setAnnounce(`Fetching ${layer.title} from NASA…`)
     try {
-      const [xml, coast] = await Promise.all([
+      // Colour table, coastlines and every tile of every day, all at once.
+      const days = then ? [then, date] : [date]
+      const [xml, coast, ...maps] = await Promise.all([
         fetchColormap(layer.colormap).catch(() => null),
-        fetch(wmsUrl('Coastlines_15m', null)).then((r) => r.blob()).then((b) => createImageBitmap(b)).catch(() => null),
+        coastlines(),
+        ...days.map((d) => fetchWorld(layer.gibs, layer.tiles, d)),
       ])
       const table = xml ? parseColormap(xml, layer.toUnit) : []
-      const days = then ? [then, date] : [date]
       const frames = await Promise.all(
-        days.map(async (d) => {
-          const res = await fetch(wmsUrl(layer.gibs, d))
-          if (!res.ok || !res.headers.get('content-type')?.startsWith('image/')) throw new Error('gibs')
-          const blob = await res.blob()
-          const img = await createImageBitmap(blob)
-          const px = table.length ? pixelsOf(img) : null
-          const readAt = px ? (at: (number | undefined)[]) => readValues(px, img.width, img.height, table, 32, at) : undefined
-          const url = await displayImage(img, coast)
+        days.map(async (d, i) => {
+          const map = maps[i]
+          if (!map) throw new Error('gibs')
+          const px = table.length ? pixelsOf(map) : null
+          const readAt = px ? (at: (number | undefined)[]) => readValues(px, map.width, map.height, table, 32, at) : undefined
+          const [blob, url] = await Promise.all([pngOf(map), displayImage(map, coast)])
           return { id: null, blob, name: `${layer.id}-${d}.png`, url, label: then ? prettyDate(d) : '', readAt }
         }),
       )

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { daysAgo, LIVE_LAYERS, liveTrack, parseColormap, readValues, validDate, wmsUrl, yearBefore } from '../live'
+import { daysAgo, LIVE_LAYERS, liveTrack, parseColormap, readValues, tileUrls, validDate, yearBefore } from '../live'
 import { formatValue } from '../describe'
 
 // Trimmed copy of a GIBS colour table: a no-data entry, open-ended ends, ranges and a single value.
@@ -57,11 +57,14 @@ describe('readValues', () => {
 })
 
 describe('live helpers', () => {
-  it('builds a WMS request for the day', () => {
-    const u = new URL(wmsUrl('GHRSST_L4_MUR_Sea_Surface_Temperature', '2026-11-12'))
-    expect(u.searchParams.get('LAYERS')).toBe('GHRSST_L4_MUR_Sea_Surface_Temperature')
-    expect(u.searchParams.get('TIME')).toBe('2026-11-12')
-    expect(u.searchParams.get('FORMAT')).toBe('image/png')
+  it('asks for the six level-1 tiles that cover the world', () => {
+    const t = tileUrls('GHRSST_L4_MUR_Sea_Surface_Temperature', '1km', '2026-11-12')
+    expect(t).toHaveLength(6)
+    expect(t[0].url).toBe(
+      'https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/GHRSST_L4_MUR_Sea_Surface_Temperature/default/2026-11-12/1km/1/0/0.png',
+    )
+    expect(t.map((x) => `${x.row}/${x.col}`)).toEqual(['0/0', '0/1', '0/2', '1/0', '1/1', '1/2'])
+    expect(tileUrls('Coastlines_15m', '15.625m', null)[5].url).toMatch(/Coastlines_15m\/default\/15\.625m\/1\/1\/2\.png$/)
   })
   it('handles dates', () => {
     expect(yearBefore('2026-11-12')).toBe('2025-11-12')

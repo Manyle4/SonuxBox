@@ -6,6 +6,7 @@ export interface LiveLayer {
   id: string // short name for links, e.g. "sst"
   title: string
   gibs: string // GIBS layer name
+  tiles: string // its WMTS tile matrix set, e.g. "1km"
   colormap: string // GIBS colour table name
   about: string
   listen: string
@@ -22,6 +23,7 @@ export const LIVE_LAYERS: LiveLayer[] = [
     id: 'sst',
     title: 'Sea temperature',
     gibs: 'GHRSST_L4_MUR_Sea_Surface_Temperature',
+    tiles: '1km',
     from: 'MUR analysis (NASA JPL), blending several satellites',
     colormap: 'GHRSST_Sea_Surface_Temperature',
     about: 'Sea surface temperature from the MUR analysis, blending several satellites.',
@@ -35,6 +37,7 @@ export const LIVE_LAYERS: LiveLayer[] = [
     id: 'rain',
     title: 'Rain and snow',
     gibs: 'IMERG_Precipitation_Rate',
+    tiles: '2km',
     from: 'IMERG, from the GPM satellite constellation (NASA and JAXA)',
     colormap: 'GPM_Precipitation_Rate',
     about: 'Rain and snow falling right now, from the GPM satellites (IMERG).',
@@ -48,6 +51,7 @@ export const LIVE_LAYERS: LiveLayer[] = [
     id: 'green',
     title: 'Plant greenness',
     gibs: 'MODIS_Terra_NDVI_8Day',
+    tiles: '250m',
     from: 'MODIS on the Terra satellite, 8-day composite',
     colormap: 'MODIS_NDVI',
     about: 'How green the land is (NDVI), from MODIS on the Terra satellite, over 8 days.',
@@ -61,6 +65,7 @@ export const LIVE_LAYERS: LiveLayer[] = [
     id: 'landtemp',
     title: 'Land temperature',
     gibs: 'MODIS_Terra_Land_Surface_Temp_Day',
+    tiles: '1km',
     from: 'MODIS on the Terra satellite, daytime pass',
     colormap: 'MODIS_Land_Surface_Temp',
     about: 'Daytime ground temperature from MODIS on the Terra satellite.',
@@ -75,6 +80,7 @@ export const LIVE_LAYERS: LiveLayer[] = [
     id: 'aod',
     title: 'Haze and smoke',
     gibs: 'MODIS_Combined_Value_Added_AOD',
+    tiles: '2km',
     from: 'MODIS on the Terra and Aqua satellites, combined',
     colormap: 'MODIS_Combined_Value_Added_AOD',
     about: 'How much dust, smoke and haze is in the air (aerosol optical depth), from MODIS.',
@@ -87,16 +93,50 @@ export const LIVE_LAYERS: LiveLayer[] = [
 ]
 
 export const WORLD = { west: -180, east: 180, north: 90, south: -90 }
-const WMS = 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi'
+const WMTS = 'https://gibs.earthdata.nasa.gov/wmts/epsg4326/best'
 
-export function wmsUrl(layer: string, date: string | null, format = 'image/png') {
-  const q = new URLSearchParams({
-    SERVICE: 'WMS', REQUEST: 'GetMap', VERSION: '1.3.0', CRS: 'EPSG:4326',
-    BBOX: '-90,-180,90,180', WIDTH: '1024', HEIGHT: '512', FORMAT: format, LAYERS: layer,
-  })
-  if (date) q.set('TIME', date)
-  return `${WMS}?${q}`
+// GIBS's ready-made tiles, not its WMS: WMS draws the whole planet on request and can take
+// a minute; tiles are pre-made and come back in under a second.
+// Zoom level 1 of the EPSG:4326 grid is 3×2 tiles of 512 px at 0.28125° a pixel, starting
+// at 180°W, 90°N, so the whole world is the top-left 1280×640 (the rest is padding).
+export const WORLD_PX = { width: 1280, height: 640 }
+const TILE = 512
+
+export function tileUrls(layer: string, matrixSet: string, date: string | null) {
+  const out: { url: string; row: number; col: number }[] = []
+  for (let row = 0; row < 2; row++) {
+    for (let col = 0; col < 3; col++) {
+      const time = date ? `${date}/` : ''
+      out.push({ url: `${WMTS}/${layer}/default/${time}${matrixSet}/1/${row}/${col}.png`, row, col })
+    }
+  }
+  return out
 }
+
+// Fetches the six tiles at once and stitches them into one world map.
+// Missing tiles stay transparent; null when none came back at all.
+export async function fetchWorld(layer: string, matrixSet: string, date: string | null) {
+  const canvas = document.createElement('canvas')
+  canvas.width = WORLD_PX.width
+  canvas.height = WORLD_PX.height
+  const g = canvas.getContext('2d', { willReadFrequently: true })!
+  const drawn = await Promise.all(
+    tileUrls(layer, matrixSet, date).map(async (t) => {
+      try {
+        const res = await fetch(t.url)
+        if (!res.ok || !res.headers.get('content-type')?.startsWith('image/')) return false
+        g.drawImage(await createImageBitmap(await res.blob()), t.col * TILE, t.row * TILE)
+        return true
+      } catch {
+        return false
+      }
+    }),
+  )
+  return drawn.some(Boolean) ? canvas : null
+}
+
+let coast: Promise<HTMLCanvasElement | null> | null = null
+export const coastlines = () => (coast ??= fetchWorld('Coastlines_15m', '15.625m', null).catch(() => null))
 
 const iso = (d: Date) => d.toISOString().slice(0, 10)
 export const daysAgo = (n: number, from = new Date()) => iso(new Date(from.getTime() - n * 86400_000))
@@ -212,7 +252,7 @@ export const fetchColormap = (name: string) => {
 }
 
 // Draws the data over a dark sea with coastlines on top, for showing (the engine hears the raw data).
-export async function displayImage(data: ImageBitmap, coast: ImageBitmap | null) {
+export async function displayImage(data: HTMLCanvasElement, coast: HTMLCanvasElement | null) {
   const canvas = document.createElement('canvas')
   canvas.width = data.width
   canvas.height = data.height
@@ -230,11 +270,8 @@ export async function displayImage(data: ImageBitmap, coast: ImageBitmap | null)
   return URL.createObjectURL(blob!)
 }
 
-export function pixelsOf(img: ImageBitmap) {
-  const canvas = document.createElement('canvas')
-  canvas.width = img.width
-  canvas.height = img.height
-  const g = canvas.getContext('2d', { willReadFrequently: true })!
-  g.drawImage(img, 0, 0)
-  return g.getImageData(0, 0, img.width, img.height).data
-}
+export const pixelsOf = (c: HTMLCanvasElement) => c.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, c.width, c.height).data
+
+// The stitched map as a PNG, for the engine. PNG keeps the colours exact.
+export const pngOf = (c: HTMLCanvasElement) =>
+  new Promise<Blob>((ok, fail) => c.toBlob((b) => (b ? ok(b) : fail(new Error('png'))), 'image/png'))
