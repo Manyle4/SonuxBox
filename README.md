@@ -16,20 +16,28 @@ NASA's Earth Information Center (EIC) makes stunning visualisations, but a pictu
 
 - **An Earth Jukebox** of 12 tracks made from NASA EIC / Scientific Visualization Studio frames. Each track comes with what the data shows, what to listen for, and a link to its source.
 - **A time-lapse:** Ukraine's night lights in 2012, then 2023. You can hear the melody thin out as the lights go dark.
+- **A guided tour:** a narrated walk through carbon monoxide, aerosols, lightning and Ukraine, with a fact from each track's own data.
+- **Every colour gets an instrument:** on data maps, each distinct colour of the data plays its own line. In Aerosols, sulfate plays a soft pluck and dust plays bells, named from NASA's own legend.
+- **Real values:** where NASA publishes a colour scale, readings come off it. Ocean currents reads sea temperature: "about 26 °C".
+- **Compare mode:** two tracks at once, one per ear, kept in step, so on two world maps you hear the same longitude in both ears. Where smoke and pollution overlap, both ears get loud together.
 - **Bring your own image:** upload any PNG or JPEG map and hear it.
-- **Live controls:** switch the melody, bass, pad and drums on and off, change the speed, and download what you hear as a WAV.
+- **Live controls:** switch each layer on and off (melody, bass, pad, drums, colour layers), change the speed, turn reverb on and off, and download what you hear as a WAV.
 - **Follow along:** a playhead sweeps the image, the slice being heard is highlighted, and a piano roll lights up as notes play.
+- **Share and install:** links like `?track=co&compare=aerosol` open straight to a track. The site can be installed, and the jukebox works offline after one visit.
 
 ### Accessibility
 
-- **Written description:** "What you're hearing" explains each piece in plain words: where the melody is busiest, where the signal is strongest, the highest note, and how much is quiet. For a time-lapse, it compares the frames. A **Read aloud** button speaks it for people who don't use a screen reader.
-- **Explore mode:** hover, drag a finger, or use the arrow keys across the image to hear it one slice at a time. To a screen reader the image is a slider ("Column 12 of 32: strong signal, near the top, note G4"). Phones vibrate harder over stronger slices (Android).
+- **Written description, with places:** "What you're hearing" explains each piece in plain words. On world maps it names places: "busiest over Alaska and northern Canada, South America and Central Africa… strongest over Central Africa". For a time-lapse, it compares the frames.
+- **A real voice:** **Read aloud** and the tour use narration recorded with the open [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) voice model. Each recording carries a fingerprint of its text, and if the text changes the page falls back to the browser's voice rather than play something out of date.
+- **Live captions:** a caption line says what's under the playhead ("Now: Central Africa, strong signal, note G5"). Screen readers can follow it with "Announce while playing".
+- **Explore mode:** hover, drag a finger, or use the arrow keys across the image to hear it one slice at a time. To a screen reader the image is a slider ("Central Africa, slice 18 of 32: strong signal, near the top, note G4"). Phones vibrate harder over stronger slices (Android).
+- **Themes and motion:** dark, light and high-contrast themes, chosen from your system settings to start with. Reduced motion turns off animation.
 - **Stereo:** the sound moves from your left ear to your right as the scan crosses the image.
 - **Keyboard:** everything works from the keyboard. Space plays and pauses, and status changes are announced.
 
 ## How an image becomes music
 
-1. **Read the image.** It's cut into 32 vertical slices, one per beat, read left to right. Most NASA frames have a legend strip along the bottom, which is ignored (the crop is set per image).
+1. **Read the image.** It's cut into 32 vertical slices, one per beat, read left to right. Legend strips and logos along the bottom or top are ignored (the crop is set per image).
 2. **Measure each slice.** There are two ways to read an image:
    - **Adaptive** (for data maps) uses K-means to learn the image's own colours and treats the most common one as the background. Each pixel's *signal* is how far its colour is from that background.
    - **Terrain** (for real-colour Earth images) sorts pixels into ocean, vegetation, land, ice/cloud and dark, using fixed colour rules.
@@ -38,8 +46,9 @@ NASA's Earth Information Center (EIC) makes stunning visualisations, but a pictu
    - **Bass:** one note per bar. It rests on the home note in quiet bars and lifts to the fifth in busy ones.
    - **Pad:** soft chords from a progression that suits the scale.
    - **Drums:** a hit wherever the signal suddenly jumps up, such as lightning, city clusters or the edge of a plume.
+   - **Colour layers** (adaptive mode): the clearly-signal pixels are grouped into colour families. Up to two distinct colours each get an instrument: a soft pluck an octave below the melody off the beat, and bells an octave above on the beat.
    - **Key, scale and tempo** come from the image: its main colour picks the key (30° of hue per key), and how much is going on picks the scale and tempo.
-4. **Play.** A small additive synthesizer renders the sound, with ADSR envelopes, overtones, detuned pad voices and vibrato. The C++ engine writes it as a WAV. The website renders the same synth in the browser, matching the engine sample for sample, so it can mute layers, change speed and pan in stereo instantly.
+4. **Play.** A small additive synthesizer renders the sound, with ADSR envelopes, overtones, detuned pad voices and vibrato. The C++ engine writes it as a WAV. The website runs the same synth in the browser (it matches the engine's WAV to within a sample of timing), so it can mute layers, change speed, add reverb and pan in stereo instantly.
 
 ## NASA data
 
@@ -57,6 +66,8 @@ All images are frames from NASA visualisations listed in the challenge resources
 | Lightning | [Lightning Events Detected from the ISS 2017–2023](https://svs.gsfc.nasa.gov/5011/) |
 | Carbon dioxide | [DYAMOND Global Carbon Dioxide](https://svs.gsfc.nasa.gov/5196/) |
 | Perpetual Ocean | [Perpetual Ocean 2](https://svs.gsfc.nasa.gov/5425/) |
+
+Colour scales come from SVS too: the [sea surface temperature bar](https://svs.gsfc.nasa.gov/3912/) and the [aerosol type legend](https://svs.gsfc.nasa.gov/5669/) (copies in `images/legends`).
 
 Inspiration: NASA's own sonification of [Caldwell 73](https://svs.gsfc.nasa.gov/13786/), which maps brightness and position to volume and pitch.
 
@@ -77,8 +88,15 @@ frontend/  (React + Vite, hosted on Vercel)
 |---|---|---|
 | `mode` | `adaptive` or `terrain` | `adaptive` |
 | `crop` | share of the bottom to ignore, `0`–`0.3` | `0.12` |
+| `cropTop` | share of the top to ignore (logos), `0`–`0.3` | `0` |
+| `scale` | a colour bar as `#rrggbb:value;#rrggbb:value;…`, matched by hue | none |
 
-The response includes `scale`, `bpm`, `columns`, `stepSec`, `musicSec`, `imageWidth`/`imageHeight`, `cropBottom`, per-column `columnStats`, and `notes` (each with `start`, `dur`, `midi`, `vel` and `voice`: `melody`, `bass`, `pad` or `perc`). It also gives an `audioUrl` for a WAV the server rendered. Those files are temporary.
+The response includes:
+- **Piece:** `scale`, `bpm`, `columns`, `stepSec`, `musicSec`.
+- **Image:** `imageWidth`/`imageHeight`, `cropBottom`/`cropTop`.
+- **`layers`:** colour, hex and which voice plays it.
+- **Per column, `columnStats`:** signal, height, `peakPos` (height of the strongest band), and `value` when a scale was given.
+- **`notes`:** each with `start`, `dur`, `midi`, `vel` and `voice`: `melody`, `bass`, `pad`, `perc`, `pluck` or `bell`. It also gives an `audioUrl` for a WAV the server rendered. Those files are temporary.
 
 Errors are always `{"error": "..."}`:
 - 400: bad input
@@ -106,9 +124,18 @@ cd frontend
 npm install
 npm run dev          # http://localhost:5173 (uses the Heroku API unless VITE_API_URL is set)
 npm run prerender    # after changing src/tracks.json or the engine
+npm run narration    # re-record changed narration with Kokoro (needs tools/narration set up, below)
+npm test             # unit tests
 ```
 
-**Tests:** `tools/test_api.sh [api-url]` runs every jukebox image through the API in both modes, and checks the error replies.
+**Narration** needs Python 3.10–3.13 and the Kokoro model files:
+- **Packages:** run `pip install kokoro-onnx soundfile` into `tools/narration/.venv`.
+- **Model files:** put `kokoro-v1.0.onnx` and `voices-v1.0.bin` from the [kokoro-onnx releases](https://github.com/thewh1teagle/kokoro-onnx/releases) in `tools/narration/models/`.
+
+**Tests:**
+- **Website:** `npm test` runs the unit tests: places, descriptions against the real tracks, time-lapses, narration fingerprints and the synth.
+- **API:** `tools/test_api.sh [api-url]` runs every jukebox image through the API in both modes, and checks the error replies.
+- **CI:** GitHub Actions runs both on every push.
 
 **Deploy:** `git push heroku main` builds the engine's Docker image on Heroku (`heroku.yml`). The site deploys on Vercel with `frontend` as the root directory.
 
@@ -119,5 +146,5 @@ npm run prerender    # after changing src/tracks.json or the engine
 | `src/` | the engine: analysis (`terrain.h`, `adaptive.h`), composition (`earth_pipeline.h`, `composer.h`), synth (`synth.h`), API server and CLI |
 | `frontend/` | the website |
 | `images/` | source images |
-| `tools/` | API test, earlier prototypes and debug tools (`-DSONUX_TOOLS=OFF` skips them) |
+| `tools/` | API test, Kokoro narration recorder, earlier prototypes and debug tools (`-DSONUX_TOOLS=OFF` skips them) |
 | `third_party/` | cpp-httplib, miniaudio |
