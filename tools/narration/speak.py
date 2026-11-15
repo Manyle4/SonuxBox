@@ -35,13 +35,14 @@ def main() -> None:
     for key, text in texts.items():
         h = text_hash(text)
         if index.get(key) == h and (OUT / f"{key}.mp3").exists():
-            print(f"  same   {key}")
+            print(f"  same   {key}", flush=True)
             continue
         kokoro = kokoro or Kokoro(str(HERE / "models" / "kokoro-v1.0.onnx"), str(HERE / "models" / "voices-v1.0.bin"))
         samples, rate = kokoro.create(text, voice=VOICE, speed=1.0, lang="en-us")
         sf.write(OUT / f"{key}.mp3", samples, rate, format="MP3", compression_level=0.75)
         index[key] = h
-        print(f"  voiced {key} ({len(samples) / rate:.0f} s)")
+        index_path.write_text(json.dumps(index, indent=2, sort_keys=True) + "\n")  # save as we go
+        print(f"  voiced {key} ({len(samples) / rate:.0f} s)", flush=True)
 
     for stale in set(index) - set(texts):  # tracks that no longer exist
         (OUT / f"{stale}.mp3").unlink(missing_ok=True)
