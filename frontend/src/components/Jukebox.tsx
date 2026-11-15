@@ -101,7 +101,22 @@ export function Jukebox(p: Props) {
   // Needle: on the record only while it plays, from the outer groove (-6°) to near the
   // label (18°); lifted back to its rest when paused or stopped. Angles measured so it
   // stays on the grooves at both record sizes (230 px desktop, 190 px phone).
-  const arm = playing ? -6 + progress * 24 : -28
+  const target = playing ? -6 + progress * 24 : -28
+  // The swing (drop or lift) is animated towards a fixed point; after that the needle follows
+  // the music directly. Animating the moving target restarted the swing every frame, so the
+  // needle crawled and spent the start of each piece beside the record.
+  const [wasPlaying, setWasPlaying] = useState(playing)
+  const [swingTo, setSwingTo] = useState<number | null>(null)
+  if (playing !== wasPlaying) {
+    setWasPlaying(playing)
+    setSwingTo(target)
+  }
+  useEffect(() => {
+    if (swingTo === null) return
+    const id = setTimeout(() => setSwingTo(null), 450)
+    return () => clearTimeout(id)
+  }, [swingTo])
+  const arm = swingTo ?? target
   const queued = new Map<string, number>()
   p.queue.forEach((q, i) => { if (!queued.has(itemKey(q))) queued.set(itemKey(q), i + 1) })
 
@@ -127,7 +142,7 @@ export function Jukebox(p: Props) {
               <span>{now?.code ?? (now?.live ? 'LIVE' : now ? '♪' : '')}</span>
             </div>
           </div>
-          <svg className="jb-arm" viewBox="0 0 60 150" style={{ '--arm': `${arm}deg` } as CSSProperties} aria-hidden="true">
+          <svg className={`jb-arm${swingTo !== null ? ' swing' : ''}`} viewBox="0 0 60 150" style={{ '--arm': `${arm}deg` } as CSSProperties} aria-hidden="true">
             <circle cx="30" cy="16" r="13" className="pivot" />
             <path d="M30 16 L30 112 L22 134" className="tube" />
             <rect x="14" y="128" width="16" height="12" rx="2" transform="rotate(18 22 134)" className="head" />
