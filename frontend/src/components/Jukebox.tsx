@@ -98,8 +98,10 @@ export function Jukebox(p: Props) {
 
   const { now, playing, time, duration } = p
   const progress = duration > 0 ? Math.min(time / duration, 1) : 0
-  // Needle: parked off the record when idle, then from the outer groove inwards.
-  const arm = now?.ready ? -4 + progress * 18 : -28
+  // Needle: on the record only while it plays, from the outer groove (-6°) to near the
+  // label (18°); lifted back to its rest when paused or stopped. Angles measured so it
+  // stays on the grooves at both record sizes (230 px desktop, 190 px phone).
+  const arm = playing ? -6 + progress * 24 : -28
   const queued = new Map<string, number>()
   p.queue.forEach((q, i) => { if (!queued.has(itemKey(q))) queued.set(itemKey(q), i + 1) })
 
