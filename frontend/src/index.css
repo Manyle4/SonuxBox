@@ -11,6 +11,9 @@
   --bass: #f6ad55;
   --pad: #9f7aea;
   --danger: #fc8181;
+  --active: #ffffff; /* lit notes */
+  --head: #ffffff; /* piano-roll playhead */
+  --border-w: 1px;
   --radius: 12px;
   color-scheme: dark;
   font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -114,8 +117,8 @@ h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; colo
 .note.melody { fill: var(--melody); }
 .note.bass { fill: var(--bass); }
 .note.pad { fill: var(--pad); }
-.note.active { fill: #fff; opacity: 1; }
-.rollhead { stroke: #fff; stroke-width: 2; }
+.note.active { fill: var(--active); opacity: 1; }
+.rollhead { stroke: var(--head); stroke-width: 2; }
 .roll figcaption { display: flex; gap: 16px; margin-top: 8px; font-size: 0.8rem; color: var(--muted); }
 .key::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 .key.melody::before { background: var(--melody); }
@@ -190,7 +193,7 @@ footer a { color: var(--muted); }
 .frames { display: flex; gap: 6px; margin-bottom: 10px; }
 .frames button { font-size: 0.85rem; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); }
 .frames button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.frame-label { position: absolute; top: 10px; right: 10px; padding: 2px 10px; border-radius: 6px; background: rgba(11, 15, 20, 0.8); font-weight: 600; font-variant-numeric: tabular-nums; }
+.frame-label { position: absolute; top: 10px; right: 10px; padding: 2px 10px; border-radius: 6px; background: rgba(11, 15, 20, 0.8); font-weight: 600; font-variant-numeric: tabular-nums; color: #fff; }
 .framemark { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; }
 .roll { position: relative; }
 .framelabel { position: absolute; top: 4px; margin-left: 6px; font-size: 0.75rem; color: var(--accent); pointer-events: none; }
@@ -223,3 +226,37 @@ footer a { color: var(--muted); }
 .compare-pick select { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; }
 .compare-text { color: var(--accent) !important; }
 @media (max-width: 520px) { .compare-maps { grid-template-columns: 1fr; } .compare-maps .ear { grid-column: auto !important; grid-row: auto !important; } }
+
+/* ---- themes: light and high contrast (dark is the default above) ---- */
+:root[data-theme="light"] {
+  --bg: #f4f6f9; --panel: #ffffff; --panel-2: #eef2f6; --line: #d3dbe5;
+  --text: #0f1720; --muted: #4a5a6c; --accent: #0f766e; --accent-ink: #ffffff;
+  --melody: #0f766e; --bass: #c05621; --pad: #6b46c1; --perc: #334155; --danger: #c53030;
+  --active: #0f1720; --head: #0f1720;
+  color-scheme: light;
+}
+:root[data-theme="contrast"] {
+  --bg: #000000; --panel: #000000; --panel-2: #000000; --line: #ffffff;
+  --text: #ffffff; --muted: #ffffff; --accent: #ffd400; --accent-ink: #000000;
+  --melody: #ffd400; --bass: #ff8c00; --pad: #00e5ff; --perc: #ffffff; --danger: #ff6b6b;
+  --active: #ffffff; --head: #ffffff; --border-w: 2px;
+  color-scheme: dark;
+}
+:root[data-theme="contrast"] .stage, :root[data-theme="contrast"] .sample, :root[data-theme="contrast"] .dropzone,
+:root[data-theme="contrast"] .caption, :root[data-theme="contrast"] .mixer button, :root[data-theme="contrast"] .facts li { border-width: var(--border-w); }
+:root[data-theme="contrast"] :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+:root[data-theme="contrast"] a { text-decoration: underline; }
+:root[data-theme="light"] .roll svg { background: #e8edf3; }
+:root[data-theme="light"] .band { background: rgba(15, 118, 110, 0.22); }
+
+.theme { display: inline-flex; gap: 4px; margin-left: 12px; vertical-align: middle; }
+.theme button { font-size: 0.75rem; padding: 3px 9px; border-radius: 999px; border: var(--border-w) solid var(--line); background: var(--panel-2); color: var(--text); }
+.theme button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+header .top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+
+/* ---- reduced motion: no spinning, sliding or smooth scrolling ---- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .spinner { border-top-color: var(--line); border-right-color: var(--accent); }
+  .sample:hover:not(:disabled) { transform: none; }
+}

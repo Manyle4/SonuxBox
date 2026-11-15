@@ -16,6 +16,7 @@ import { narrationKey, narrationText } from './narration'
 import { speak, type Speech } from './speech'
 import { TOUR, tourText } from './tour'
 import { TourBar } from './components/TourBar'
+import { ThemePicker } from './components/ThemePicker'
 import { joinFrames, segmentAt } from './series'
 import { framesOf, imageUrl, prerendered, TRACKS, trackUrl, type Track } from './tracks'
 
@@ -141,7 +142,8 @@ export default function App() {
   // On phones the player sits below the jukebox, so bring it into view once it's drawn.
   useEffect(() => {
     if (source && window.matchMedia('(max-width: 860px)').matches) {
-      stageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      const still = matchMedia('(prefers-reduced-motion: reduce)').matches
+      stageRef.current?.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'start' })
     }
   }, [source])
 
@@ -323,9 +325,12 @@ export default function App() {
   return (
     <div className="app">
       <header>
-        <h1>
-          Sonux<span>Box</span>
-        </h1>
+        <div className="top">
+          <h1>
+            Sonux<span>Box</span>
+          </h1>
+          <ThemePicker />
+        </div>
         <p>An Earth Jukebox: hear NASA's views of our changing planet. Each slice of the image, left to right, becomes a beat.</p>
         {tourStep === null && (
           <button className="tour-start" onClick={startTour}>▶ Take the guided tour</button>
