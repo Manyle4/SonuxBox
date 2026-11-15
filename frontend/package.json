@@ -9,7 +9,8 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "prerender": "node scripts/prerender.mjs",
-    "narration": "vite build --ssr scripts/narration-texts.ts --outDir .narration-build --emptyOutDir && node .narration-build/narration-texts.js | ../tools/narration/.venv/bin/python ../tools/narration/speak.py"
+    "narration": "vite build --ssr scripts/narration-texts.ts --outDir .narration-build --emptyOutDir && node .narration-build/narration-texts.js | ../tools/narration/.venv/bin/python ../tools/narration/speak.py",
+    "test": "vitest run"
   },
   "dependencies": {
     "react": "^19.3.1",
@@ -22,6 +23,7 @@
     "@vitejs/plugin-react": "^6.1.2",
     "oxlint": "^1.90.0",
     "typescript": "~7.0.2",
-    "vite": "^8.3.6"
+    "vite": "^8.3.6",
+    "vitest": "^4.1.12"
   }
 }
