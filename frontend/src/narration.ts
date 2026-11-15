@@ -9,7 +9,7 @@ export function narrationText(track: Track | null, title: string, results: Analy
   const description =
     results.length > 1
       ? describeSeries(results.map((r, i) => ({ result: r, label: labels[i] })), title)
-      : describePiece(results[0], title, track?.geo)
+      : describePiece(results[0], title, track ?? undefined)
   return [track ? `${track.about} ${track.listen}` : '', description].filter(Boolean).join(' ')
 }
 

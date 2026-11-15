@@ -38,6 +38,6 @@ export function tourText(step: TourStep, results: AnalyzeResult[] | null, labels
   const fact =
     results.length > 1
       ? describeSeries(results.map((r, i) => ({ result: r, label: labels[i] })), track.title).split('. ').slice(-1)[0]
-      : strongestSentence(results[0], track.geo)
+      : strongestSentence(results[0], track)
   return `${step.intro} ${fact}`
 }

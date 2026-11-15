@@ -81,7 +81,7 @@ export default function App() {
         src.frames.map(
           async (f) =>
             (f.id && (await prerendered(f.id, m))) ||
-            (await analyze(f.blob, f.name, m, src.track?.crop, ctrl.signal, src.track?.cropTop)),
+            (await analyze(f.blob, f.name, m, src.track?.crop, ctrl.signal, src.track?.cropTop, src.track?.scale)),
         ),
       )
       if (ctrl.signal.aborted) return
@@ -250,12 +250,12 @@ export default function App() {
   const shownFrame = source?.frames[segIndex] ?? source?.frames[0]
 
   // Described at normal speed, so the pre-made narration always matches.
-  const geo = track?.geo
+  const info = track ?? undefined
   const description = !results || !source
     ? ''
     : series
       ? describeSeries(results.map((r, i) => ({ result: r, label: source.frames[i].label })), title)
-      : describePiece(results[0], title, geo)
+      : describePiece(results[0], title, info)
   const spoken = results && source ? narrationText(track, title, results, source.frames.map((f) => f.label)) : ''
 
   const toggleLayer = (v: Voice) =>
@@ -355,7 +355,7 @@ export default function App() {
                 time={segTime}
                 playing={playing}
                 onSeek={(t) => seek((seg?.start ?? 0) + t)}
-                geo={geo}
+                info={info}
               />
 
               {ready && piece && seg && (
@@ -365,9 +365,9 @@ export default function App() {
                   <Mixer muted={muted} onToggle={toggleLayer} rate={rate} onRate={setRate}
                     reverb={reverb} onReverb={() => setReverb((r) => !r)}
                     hasPerc={piece.notes.some((n) => n.voice === 'perc')}
-                    layers={(seg.result.layers ?? []).filter((l) => piece.notes.some((n) => n.voice === l.voice))} />
-                  <Caption result={seg.result} time={segTime} playing={playing} geo={geo} />
-                  <PianoRoll result={piece} time={time} onSeek={seek} muted={muted}
+                    layers={(seg.result.layers ?? []).filter((l) => piece.notes.some((n) => n.voice === l.voice))} info={info} />
+                  <Caption result={seg.result} time={segTime} playing={playing} info={info} />
+                  <PianoRoll result={piece} time={time} onSeek={seek} muted={muted} info={info}
                     marks={series ? joined.segments.map((s) => ({ at: s.start, label: s.label })) : []} />
 
                   <section className="hearing" aria-labelledby="hearing-title">

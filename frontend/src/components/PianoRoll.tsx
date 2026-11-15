@@ -1,5 +1,8 @@
 import type { MouseEvent } from 'react'
 import type { AnalyzeResult, Voice } from '../api'
+import { layerName, type TrackInfo } from '../describe'
+
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1)
 
 interface Props {
   result: AnalyzeResult
@@ -7,12 +10,13 @@ interface Props {
   onSeek: (sec: number) => void
   muted?: Set<Voice>
   marks?: { at: number; label: string }[] // frame starts in a time-lapse
+  info?: TrackInfo
 }
 
 const W = 1000
 const H = 220
 
-export function PianoRoll({ result, time, onSeek, muted, marks = [] }: Props) {
+export function PianoRoll({ result, time, onSeek, muted, marks = [], info }: Props) {
   const total = Math.max(result.musicSec, result.columns * result.stepSec)
   const pitched = result.notes.filter((n) => n.voice !== 'perc')
   const hits = result.notes.filter((n) => n.voice === 'perc')
@@ -85,7 +89,7 @@ export function PianoRoll({ result, time, onSeek, muted, marks = [] }: Props) {
         {hits.length > 0 && <span className="key perc">Drums</span>}
         {(result.layers ?? []).filter((l) => result.notes.some((n) => n.voice === l.voice)).map((l) => (
           <span key={l.voice} className="key layerkey" style={{ '--swatch': l.hex } as React.CSSProperties}>
-            {l.color[0].toUpperCase() + l.color.slice(1)} ({l.voice})
+            {cap(layerName(l, info))} ({l.voice})
           </span>
         ))}
       </figcaption>

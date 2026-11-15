@@ -1,6 +1,6 @@
 import { useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react'
 import type { AnalyzeResult } from '../api'
-import type { Geo } from '../geo'
+import type { TrackInfo } from '../describe'
 import { columnInfo, describeColumn } from '../describe'
 import { playColumn } from '../explore'
 
@@ -12,12 +12,12 @@ interface Props {
   time: number
   playing: boolean
   onSeek: (sec: number) => void
-  geo?: Geo
+  info?: TrackInfo
 }
 
 // The image with a playhead sweeping left to right, one column per eighth note.
 // It's also a slider: hover, drag or use the arrow keys to hear one slice at a time.
-export function MapView({ imageUrl, imageAlt, label, result, time, playing, onSeek, geo }: Props) {
+export function MapView({ imageUrl, imageAlt, label, result, time, playing, onSeek, info }: Props) {
   const [explore, setExplore] = useState<number | null>(null)
 
   const gridSec = result ? result.columns * result.stepSec : 0
@@ -90,7 +90,7 @@ export function MapView({ imageUrl, imageAlt, label, result, time, playing, onSe
           'aria-valuemin': 1,
           'aria-valuemax': result.columns,
           'aria-valuenow': shown + 1,
-          'aria-valuetext': describeColumn(result, shown, geo),
+          'aria-valuetext': describeColumn(result, shown, info),
         })}
       >
         <img src={imageUrl} alt={imageAlt} />

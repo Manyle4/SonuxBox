@@ -1,4 +1,7 @@
 import type { Layer, Voice } from '../api'
+import { layerName, type TrackInfo } from '../describe'
+
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1)
 
 interface Props {
   muted: Set<Voice>
@@ -7,6 +10,7 @@ interface Props {
   onRate: (r: number) => void
   hasPerc: boolean
   layers: Layer[] // colour layers that actually play
+  info?: TrackInfo
   reverb: boolean
   onReverb: () => void
 }
@@ -20,14 +24,14 @@ const LAYERS: { id: Voice; label: string }[] = [
 const RATES = [0.75, 1, 1.25, 1.5]
 
 // Live controls: switch layers on/off and change the speed.
-export function Mixer({ muted, onToggle, rate, onRate, hasPerc, layers, reverb, onReverb }: Props) {
+export function Mixer({ muted, onToggle, rate, onRate, hasPerc, layers, reverb, onReverb, info }: Props) {
   return (
     <div className="mixer">
       <div className="group" role="group" aria-label="Layers">
         <span className="label">Layers</span>
         {[
           ...LAYERS.filter((l) => l.id !== 'perc' || hasPerc),
-          ...layers.map((l) => ({ id: l.voice as Voice, label: `${l.color[0].toUpperCase()}${l.color.slice(1)} (${l.voice})`, hex: l.hex })),
+          ...layers.map((l) => ({ id: l.voice as Voice, label: `${cap(layerName(l, info))} (${l.voice})`, hex: l.hex })),
         ].map((l) => (
           <button
             key={l.id}

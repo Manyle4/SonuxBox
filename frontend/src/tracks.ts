@@ -1,8 +1,8 @@
 import type { AnalysisMode, AnalyzeResult } from './api'
-import type { Geo } from './geo'
+import type { TrackInfo } from './describe'
 import list from './tracks.json'
 
-export interface Track {
+export interface Track extends TrackInfo {
   id: string
   title: string
   about: string // what the data shows
@@ -12,7 +12,7 @@ export interface Track {
   cropTop?: number // share of the top to ignore (e.g. the NASA/GMAO logo)
   source: { label: string; url: string }
   frames?: { id: string; label: string }[] // a time-lapse: images played one after another
-  geo?: Geo // set for flat world maps, so descriptions can name places
+  scale?: string // the image's colour bar as "#rrggbb:value;...", sent to the engine
 }
 
 // Frames from NASA's Earth Information Center visuals, made by the Scientific

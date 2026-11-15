@@ -23,6 +23,7 @@ export interface ColumnStat {
   ocean: number // quiet share in adaptive mode
   landPos: number // 0 = bottom, 1 = top
   peakPos?: number // height of the strongest band (newer engine only)
+  value?: number // reading off the image's colour scale, when one was given
 }
 
 export interface Layer {
@@ -64,13 +65,14 @@ async function readError(res: Response): Promise<string> {
 }
 
 export async function analyze(
-  file: Blob, name: string, mode: AnalysisMode, crop?: number, signal?: AbortSignal, cropTop?: number,
+  file: Blob, name: string, mode: AnalysisMode, crop?: number, signal?: AbortSignal, cropTop?: number, scale?: string,
 ) {
   const form = new FormData()
   form.append('image', file, name)
   form.append('mode', mode)
   if (crop !== undefined) form.append('crop', String(crop))
   if (cropTop !== undefined) form.append('cropTop', String(cropTop))
+  if (scale) form.append('scale', scale)
 
   const res = await fetch(`${API_URL}/api/analyze`, { method: 'POST', body: form, signal })
   if (!res.ok) throw new Error(await readError(res))
