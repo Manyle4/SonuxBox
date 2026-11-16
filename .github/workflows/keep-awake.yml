@@ -1,0 +1,17 @@
+name: Keep the API awake
+
+# Heroku eco dynos sleep after 30 minutes without traffic, and the first visitor then
+# waits ~20 s. During judging, ping the API every 10 minutes so it's always ready.
+# Delete this file once judging is over.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # run it by hand from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping /api/health
+        run: curl -fsS -m 60 --retry 3 --retry-delay 10 https://sonuxbox-api-285f8ea04b1d.herokuapp.com/api/health
